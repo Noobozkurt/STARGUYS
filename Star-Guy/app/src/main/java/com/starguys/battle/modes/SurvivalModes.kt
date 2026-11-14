@@ -1,5 +1,6 @@
 package com.starguys.battle.modes
 
+import com.starguys.battle.game.Fx
 import android.graphics.Canvas
 import com.starguys.battle.core.G
 import com.starguys.battle.core.Save
@@ -152,7 +153,7 @@ class RisingSlimeMode(m: Match) : GameMode(m) {
             if (inSlime) {
                 f.slowT = 0.3f; f.slowAmt = 0.6f
                 f.hurt(950f * dt, m.envBody, 0f, 0f)
-                if (chance(0.3f)) m.fx.splat(f.x, f.y - 10f, 0xFF7BE84A.toInt())
+                if (chance(0.3f)) m.fx.splat(f.x, f.y, Fx.GND + 10f, 0xFF7BE84A.toInt())
             }
         }
         val alive = m.fighters.filter { !it.out }

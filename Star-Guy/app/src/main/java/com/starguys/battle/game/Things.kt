@@ -69,7 +69,7 @@ class Zone(val m: Match, val kind: Int, var x: Float, var y: Float, var r: Float
                         if (b is Actor) b.clearBurn()
                     }
                 }
-                if (com.starguys.battle.core.chance(0.6f)) m.fx.drop(x, y - 30f, dir)
+                if (com.starguys.battle.core.chance(0.6f)) m.fx.drop(x, y, Fx.GND + 30f, dir)
             }
         }
         if (life <= 0f) alive = false
@@ -157,7 +157,7 @@ class Summon(m: Match, val kind: Int, val owner: Fighter) : Actor(m) {
         animT += dt
         tickStatus(dt)
         life -= dt
-        if (life <= 0f || hp <= 0f) { alive = false; m.fx.smoke(x, y - 20f, 5, 0xFFFFFFFF.toInt()); return }
+        if (life <= 0f || hp <= 0f) { alive = false; m.fx.smoke(x, y, Fx.GND + 20f, 5, 0xFFFFFFFF.toInt()); return }
         cd -= dt
         when (kind) {
             CLONE -> {
@@ -192,9 +192,9 @@ class Summon(m: Match, val kind: Int, val owner: Fighter) : Actor(m) {
         if (!alive) return false
         hp -= d; hitFlash = 0.1f
         if (kind == CLONE) knock(kx, ky)
-        m.fx.number(x, y - z * ZS - 60f, d, 0xFFFFFFFF.toInt())
+        m.fx.number(x, y, z + 60f, d, 0xFFFFFFFF.toInt())
         (src as? Fighter ?: src?.ownerF)?.let { if (it !== owner) it.dmgDone += 0f }
-        if (hp <= 0f) { alive = false; m.fx.confetti(x, y - 30f, 10) }
+        if (hp <= 0f) { alive = false; m.fx.confetti(x, y, Fx.GND + 30f, 10) }
         return true
     }
 

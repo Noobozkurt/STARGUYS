@@ -124,7 +124,7 @@ class Projectile(val m: Match) {
 
     fun hitBody(b: Body): Boolean {
         if (!m.isEnemy(team, b)) {
-            if (heal > 0f && b is Fighter) { b.heal(heal); m.fx.ring(b.x, b.y - b.z * ZS, 30f, 0xFF7CFF8A.toInt()) }
+            if (heal > 0f && b is Fighter) { b.heal(heal); m.fx.ring(b.x, b.y, b.z, 30f, 0xFF7CFF8A.toInt()) }
             if (!pierce) { alive = false; return true }
             (hits ?: ArrayList<Body>().also { hits = it }).add(b); return false
         }
@@ -134,7 +134,7 @@ class Projectile(val m: Match) {
         if (applied) {
             if (status != St.NONE) b.applyStatus(status, statusT, owner)
             if (pull != 0f) { val o = owner; if (o != null) { val pa = ang(b.x, b.y, o.x, o.y); b.knock(cosf(pa) * pull, sinf(pa) * pull) } }
-            m.fx.hit(x, y - z * ZS, color)
+            m.fx.hit(x, y, z, color)
             onHit?.invoke(this, b)
             if (chain > 0) chainZap(b)
             if (sticky) { m.stickMine(b, ownerF, team); sticky = false }
@@ -158,7 +158,7 @@ class Projectile(val m: Match) {
         }
         val b = best ?: return
         b.hurt(dmg * 0.5f, owner, 0f, 0f)
-        m.fx.zap(from.x, from.y - from.z * ZS - 25f, b.x, b.y - b.z * ZS - 25f, color)
+        m.fx.zap(from.x, from.y, from.z + 25f, b.x, b.y, b.z + 25f, color)
     }
 
     private fun grapplePull(tx: Float, ty: Float) {
@@ -169,7 +169,7 @@ class Projectile(val m: Match) {
         o.vx = cosf(a) * sp; o.vy = sinf(a) * sp; o.vz = 260f
         o.ragdollT = 0f
         o.dashT = 0.35f
-        m.fx.line(o.x, o.y - o.z * ZS - 25f, tx, ty - 25f, 0xFFB0B0B0.toInt(), 0.25f)
+        m.fx.line(o.x, o.y, o.z + 25f, tx, ty, Fx.GND + 25f, 0xFFB0B0B0.toInt(), 0.25f)
     }
 
     fun land() {
@@ -178,7 +178,7 @@ class Projectile(val m: Match) {
         if (foam) {
             val tx = (x / T).floorInt(); val ty = (y / T).floorInt()
             for (dy in 0..1) for (dx in 0..1) m.map.placeFoam(tx + dx - (if ((x % T) < T / 2) 1 else 0), ty + dy - (if ((y % T) < T / 2) 1 else 0), 9f)
-            m.fx.smoke(x, y, 4, 0xFFFFFFFF.toInt())
+            m.fx.smoke(x, y, Fx.GND, 4, 0xFFFFFFFF.toInt())
             Sfx.play(Sfx.BUBBLE, m.volAt(x, y))
         }
         if (explodeR > 0f) {

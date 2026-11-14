@@ -210,7 +210,7 @@ class Fighter(m: Match, hero: HeroDef, var name: String, team: Int, var human: B
         gravScale = gs
         if (impact > 0f) {
             if (hasDived) { ragdollT = maxOf(ragdollT, 0.25f); hasDived = false }
-            if (impact > 650f) { m.fx.smoke(x, y - z * ZS, 3, 0xFFFFFFFF.toInt()); m.sound(Sfx.THUD, x, y, 0.5f) }
+            if (impact > 650f) { m.fx.smoke(x, y, z, 3, 0xFFFFFFFF.toInt()); m.sound(Sfx.THUD, x, y, 0.5f) }
         }
         m.mode.afterMove(this, dt)
     }
@@ -221,7 +221,7 @@ class Fighter(m: Match, hero: HeroDef, var name: String, team: Int, var human: B
         val g = m.map.groundAt(x, y)
         if (z <= g && vz < 0) {
             z = maxOf(g, z); cannonT = 0f; vx *= 0.2f; vy *= 0.2f
-            m.fx.smoke(x, y, 5, 0xFFFFFFFF.toInt()); m.sound(Sfx.THUD, x, y)
+            m.fx.smoke(x, y, Fx.GND, 5, 0xFFFFFFFF.toInt()); m.sound(Sfx.THUD, x, y)
         }
         x = clamp(x, 20f, m.map.pxW - 20f); y = clamp(y, 20f, m.map.pxH - 20f)
         if (cannonT <= 0f) { z = maxOf(z, m.map.groundAt(x, y).coerceAtLeast(0f)) }
@@ -243,7 +243,7 @@ class Fighter(m: Match, hero: HeroDef, var name: String, team: Int, var human: B
                     val a = ang(x, y, b.x, b.y)
                     b.hurt(dmg * dmgMul(), this, cosf(a) * kn, sinf(a) * kn)
                     if (b is Actor) b.ragdollT = maxOf(b.ragdollT, 0.5f)
-                    m.fx.ring(b.x, b.y - b.z * ZS - 20f, 30f, 0xFFFFFFFF.toInt())
+                    m.fx.ring(b.x, b.y, b.z + 20f, 30f, 0xFFFFFFFF.toInt())
                     m.sound(Sfx.BOING, x, y)
                     if (superKind == 0) { vz = 300f }
                 }
@@ -252,7 +252,7 @@ class Fighter(m: Match, hero: HeroDef, var name: String, team: Int, var human: B
             8 -> if (superT <= 0) { // Lady Mousse release
                 val d = maxOf(700f, absorbStore * 1.1f)
                 m.explode(x, y, 3f * T, d * dmgMul(), this, team, 900f, tiles = false, color = 0xFFFFE14D.toInt())
-                m.fx.text(x, y - z * ZS - 70f, "RENVOI ${d.toInt()}", 0xFFFFE14D.toInt())
+                m.fx.text(x, y, z + 70f, "RENVOI ${d.toInt()}", 0xFFFFE14D.toInt())
                 absorbStore = 0f
             }
         }
@@ -315,7 +315,7 @@ class Fighter(m: Match, hero: HeroDef, var name: String, team: Int, var human: B
             vz = 420f * (if (giantT > 0) 1.1f else 1f)
             onGround = false
             m.sound(Sfx.JUMP, x, y, 0.6f)
-            m.fx.smoke(x, y - z * ZS, 2, 0xFFFFFFFF.toInt())
+            m.fx.smoke(x, y, z, 2, 0xFFFFFFFF.toInt())
         } else if (!hasDived && ragdollT <= 0) {
             // Dive!
             hasDived = true
@@ -339,7 +339,7 @@ class Fighter(m: Match, hero: HeroDef, var name: String, team: Int, var human: B
         if (items.isEmpty() || !canAct()) return
         val it = items.removeAt(0)
         when (it) {
-            Items.SODA -> { speedT = 6f; m.fx.text(x, y - z * ZS - 70f, "VITESSE !", 0xFFFF5E7E.toInt()) }
+            Items.SODA -> { speedT = 6f; m.fx.text(x, y, z + 70f, "VITESSE !", 0xFFFF5E7E.toInt()) }
             Items.LOLLIPOP -> { regenT = 5f; regenRate = maxHp * 0.1f; m.sound(Sfx.HEAL, x, y) }
             Items.SHIELD -> { shieldHp = 2000f; m.sound(Sfx.BUBBLE, x, y) }
             Items.MUSHROOM -> { giantT = 10f; m.sound(Sfx.SUPER, x, y, 0.6f, 0.7f) }
@@ -358,9 +358,9 @@ class Fighter(m: Match, hero: HeroDef, var name: String, team: Int, var human: B
         // umbrella blocks frontal shots
         if (superKind == 10 && superT > 0 && src != null && src !== m.envBody) {
             val a = ang(x, y, src.x, src.y)
-            if (abs(angleDiff(face, a)) < 1.25f) { m.fx.ring(x + cosf(face) * 26f, y - z * ZS - 40f, 18f, 0xFFFF5E7E.toInt()); return false }
+            if (abs(angleDiff(face, a)) < 1.25f) { m.fx.ring(x + cosf(face) * 26f, y, z + 40f, 18f, 0xFFFF5E7E.toInt()); return false }
         }
-        if (superKind == 8 && superT > 0) { absorbStore += dmg; m.fx.number(x, y - z * ZS - bodyH, dmg, 0xFFFFE14D.toInt(), "+"); hitFlash = 0.08f; return true }
+        if (superKind == 8 && superT > 0) { absorbStore += dmg; m.fx.number(x, y, z + bodyH, dmg, 0xFFFFE14D.toInt(), "+"); hitFlash = 0.08f; return true }
         if (superT > 0 && superKind == 0) dmg *= 0.3f
         if (superT > 0 && superKind == 2) dmg *= 0.4f
         val v = vehicle
@@ -368,7 +368,7 @@ class Fighter(m: Match, hero: HeroDef, var name: String, team: Int, var human: B
         if (shieldHp > 0f) {
             val ab = minOf(shieldHp, dmg)
             shieldHp -= ab; dmg -= ab
-            if (shieldHp <= 0f) { m.fx.ring(x, y - z * ZS - 30f, 40f, 0xFF6BD3FF.toInt()); m.sound(Sfx.GLASS, x, y, 0.5f) }
+            if (shieldHp <= 0f) { m.fx.ring(x, y, z + 30f, 40f, 0xFF6BD3FF.toInt()); m.sound(Sfx.GLASS, x, y, 0.5f) }
             if (dmg <= 0f) { hitFlash = 0.05f; return true }
         }
         lastHurtT = 0f
@@ -376,7 +376,7 @@ class Fighter(m: Match, hero: HeroDef, var name: String, team: Int, var human: B
         hitFlash = 0.12f
         numAcc += dmg
         if (Save_dmgNumbers() && (numAcc >= 120f || dmg >= 60f || m.time - numT > 0.6f)) {
-            m.fx.number(x, y - z * ZS - bodyH - 8f, numAcc, if (isLocal) 0xFFFF5E7E.toInt() else 0xFFFFFFFF.toInt())
+            m.fx.number(x, y, z + bodyH + 8f, numAcc, if (isLocal) 0xFFFF5E7E.toInt() else 0xFFFFFFFF.toInt())
             numAcc = 0f; numT = m.time
         }
         var kmul = 1f
@@ -406,7 +406,7 @@ class Fighter(m: Match, hero: HeroDef, var name: String, team: Int, var human: B
         val before = hp
         hp = minOf(maxHp, hp + a)
         if (show && hp - before > 1f) {
-            m.fx.number(x, y - z * ZS - bodyH - 8f, hp - before, 0xFF7CFF8A.toInt(), "+")
+            m.fx.number(x, y, z + bodyH + 8f, hp - before, 0xFF7CFF8A.toInt(), "+")
         }
     }
 
@@ -428,8 +428,8 @@ class Fighter(m: Match, hero: HeroDef, var name: String, team: Int, var human: B
         if (out) return
         hp = 0f; out = true; deaths++
         eliminatedAt = m.time
-        m.fx.confetti(x, y - z * ZS - 30f, 28)
-        m.fx.ring(x, y - z * ZS - 20f, 50f, 0xFFFFFFFF.toInt())
+        m.fx.confetti(x, y, z + 30f, 28)
+        m.fx.ring(x, y, z + 20f, 50f, 0xFFFFFFFF.toInt())
         m.sound(Sfx.POP, x, y)
         superT = 0f; superKind = -1
         burnT = 0f; stunT = 0f; bubbleT = 0f; ragdollT = 0f; glueT = 0f; slowT = 0f
@@ -445,7 +445,7 @@ class Fighter(m: Match, hero: HeroDef, var name: String, team: Int, var human: B
     override fun onFallOut() {
         if (out) return
         if (parachutes > 0 || m.mode.saveFromFall(this)) {
-            if (parachutes > 0) { parachutes--; m.fx.text(x, y - 60f, "PARACHUTE !", 0xFFFF6B6B.toInt()) }
+            if (parachutes > 0) { parachutes--; m.fx.text(x, y, Fx.GND + 60f, "PARACHUTE !", 0xFFFF6B6B.toInt()) }
             x = safeX; y = safeY; z = m.map.groundAt(x, y).coerceAtLeast(0f) + 260f; vz = 0f; vx = 0f; vy = 0f
             ragdollT = 0f
             return
@@ -461,7 +461,7 @@ class Fighter(m: Match, hero: HeroDef, var name: String, team: Int, var human: B
         safeX = px; safeY = py
         burnT = 0f; stunT = 0f; slowT = 0f; bubbleT = 0f; ragdollT = 0f; giantT = 0f; invisT = 0f; dmgPct = 0f
         superT = 0f; superKind = -1; hasDived = false
-        m.fx.ring(x, y, 40f, 0xFFFFFFFF.toInt())
+        m.fx.ring(x, y, Fx.GND, 40f, 0xFFFFFFFF.toInt())
     }
 
     // ------------------------------------------------------------------ draw

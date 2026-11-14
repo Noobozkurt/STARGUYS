@@ -239,6 +239,9 @@ class GameView(val activity: Activity, private val makeFirst: (GameApp) -> Scree
     init {
         holder.addCallback(this)
         isFocusable = true
+        // the 3D world is rendered by a GL surface underneath; this canvas draws menus & the HUD on top
+        setZOrderMediaOverlay(true)
+        holder.setFormat(android.graphics.PixelFormat.TRANSLUCENT)
     }
 
     override fun surfaceCreated(h: SurfaceHolder) { hasSurface = true; startThread() }

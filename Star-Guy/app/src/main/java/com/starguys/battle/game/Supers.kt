@@ -34,9 +34,9 @@ object Supers {
                 var steps = 0
                 while (steps < 20 && !m.canStand(tx, ty, f.radius)) { tx -= cosf(a) * 12f; ty -= sinf(a) * 12f; steps++ }
                 if (steps >= 20) { tx = f.x; ty = f.y }
-                m.fx.pixels(f.x, f.y - f.z * ZS - 25f, 0xFF35C6F4.toInt())
+                m.fx.pixels(f.x, f.y, f.z + 25f, 0xFF35C6F4.toInt())
                 f.x = tx; f.y = ty; f.z = maxOf(0f, m.map.groundAt(tx, ty)); f.vx = 0f; f.vy = 0f
-                m.fx.pixels(f.x, f.y - f.z * ZS - 25f, 0xFF35C6F4.toInt())
+                m.fx.pixels(f.x, f.y, f.z + 25f, 0xFF35C6F4.toInt())
                 f.invisT = 2.2f
                 m.sound(Sfx.TELEPORT, f.x, f.y)
             }
@@ -45,7 +45,7 @@ object Supers {
                     val aa = a + (k - 1) * 0.25f
                     Fire.lob(f, aa, d + rf(-20f, 20f), 6f, 300f, 0f, PV.ONIGIRI, 0xFFFFFFFF.toInt(), 0.75f) {
                         heal = 1500f; r = 14f
-                        onLand = { p -> if (rf() < 0.5f) m.addPickup(Pickup(m, Pickup.HEAL, 0, p.x, p.y)); m.fx.ring(p.x, p.y, 60f, 0xFF7CFF8A.toInt()); m.sound(Sfx.HEAL, p.x, p.y) }
+                        onLand = { p -> if (rf() < 0.5f) m.addPickup(Pickup(m, Pickup.HEAL, 0, p.x, p.y)); m.fx.ring(p.x, p.y, Fx.GND, 60f, 0xFF7CFF8A.toInt()); m.sound(Sfx.HEAL, p.x, p.y) }
                     }
                 }
             }
@@ -70,7 +70,7 @@ object Supers {
                     if (tp != Tl.FLOOR && tp != Tl.BUSH && tp != Tl.ICE) continue
                     if (m.bodyOnTile(tx, ty)) continue
                     m.map.set(tx, ty, Tl.BRICK); placed++
-                    m.fx.smoke(tx * T + T / 2, ty * T + T / 2, 3, 0xFFE07B4A.toInt())
+                    m.fx.smoke(tx * T + T / 2, ty * T + T / 2, Fx.GND, 3, 0xFFE07B4A.toInt())
                 }
                 m.sound(Sfx.THUD, cx, cy)
                 if (placed == 0) f.chargeSuper(0.5f)
@@ -83,7 +83,7 @@ object Supers {
                     s.dir = a + (k - 1) * 1.6f + rf(-0.3f, 0.3f)
                     m.addSummon(s)
                 }
-                m.fx.pixels(f.x, f.y - 30f, 0xFFB46CFF.toInt())
+                m.fx.pixels(f.x, f.y, Fx.GND + 30f, 0xFFB46CFF.toInt())
                 m.sound(Sfx.TELEPORT, f.x, f.y)
             }
             10 -> { // Mamie: umbrella shield + glide
@@ -135,7 +135,7 @@ object Supers {
             Gadgets.JETPACK -> {
                 val ma = if (f.moveX != 0f || f.moveY != 0f) atan2(f.moveY, f.moveX) else f.face
                 f.vz = 560f; f.vx = cosf(ma) * 520f; f.vy = sinf(ma) * 520f; f.onGround = false
-                m.fx.smoke(f.x, f.y - f.z * ZS, 4, 0xFFFFC94D.toInt())
+                m.fx.smoke(f.x, f.y, f.z, 4, 0xFFFFC94D.toInt())
                 m.sound(Sfx.ENGINE, f.x, f.y)
             }
             Gadgets.PARACHUTE -> { if (f.isLocal) m.hud.toastSmall("Le parachute s'active tout seul en cas de chute !"); return false }
@@ -148,7 +148,7 @@ object Supers {
             }
             Gadgets.RADAR -> {
                 m.reveal(f.team, f.x, f.y, 13f * T, 8f)
-                m.fx.ring(f.x, f.y, 13f * T, 0xFF35C6F4.toInt(), 1.2f)
+                m.fx.ring(f.x, f.y, Fx.GND, 13f * T, 0xFF35C6F4.toInt(), 1.2f)
                 m.sound(Sfx.ZAP, f.x, f.y, 0.7f, 0.6f)
             }
         }

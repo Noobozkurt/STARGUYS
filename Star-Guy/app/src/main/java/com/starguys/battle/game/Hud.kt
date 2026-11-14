@@ -16,6 +16,7 @@ import com.starguys.battle.core.dist
 import com.starguys.battle.core.len
 import com.starguys.battle.core.sinf
 import com.starguys.battle.core.atan2
+import kotlin.math.abs
 
 /** On-screen controls (twin sticks + buttons) and all HUD drawing. */
 class Hud(val m: Match) {
@@ -56,13 +57,13 @@ class Hud(val m: Match) {
     private companion object { const val B_GADGET = 1; const val B_ITEM = 2; const val B_JUMP = 3; const val B_USE = 4; const val B_PING = 5; const val B_PAUSE = 6
         const val B_RESUME = 7; const val B_QUIT = 8; const val B_PREV = 9; const val B_NEXT = 10 }
 
-    private fun atkX() = W - 175f * u; private fun atkY() = H - 165f * u; private fun atkR() = 80f * u * sizeMul
-    private fun supX() = W - 330f * u; private fun supY() = H - 92f * u; private fun supR() = 50f * u * sizeMul
+    private fun fireX() = W - 150f * u; private fun fireY() = H - 190f * u; private fun fireR() = 74f * u * sizeMul
+    private fun supX() = W - 330f * u; private fun supY() = H - 108f * u; private fun supR() = 52f * u * sizeMul
     private fun btnPos(id: Int): FloatArray = when (id) {
-        B_GADGET -> floatArrayOf(W - 318f * u, H - 238f * u, 38f * u * sizeMul)
-        B_ITEM -> floatArrayOf(W - 196f * u, H - 322f * u, 36f * u * sizeMul)
-        B_JUMP -> floatArrayOf(W - 70f * u, H - 300f * u, 48f * u * sizeMul)
-        B_USE -> floatArrayOf(W - 470f * u, H - 140f * u, 46f * u * sizeMul)
+        B_GADGET -> floatArrayOf(W - 318f * u, H - 262f * u, 36f * u * sizeMul)
+        B_ITEM -> floatArrayOf(W - 210f * u, H - 352f * u, 34f * u * sizeMul)
+        B_JUMP -> floatArrayOf(W - 74f * u, H - 340f * u, 48f * u * sizeMul)
+        B_USE -> floatArrayOf(W - 480f * u, H - 150f * u, 44f * u * sizeMul)
         B_PING -> floatArrayOf(W - 222f * u, 196f * u, 26f * u)
         B_PAUSE -> floatArrayOf(40f * u, 38f * u, 26f * u)
         B_RESUME -> floatArrayOf(W / 2, H / 2 - 40f * u, 0f)
@@ -92,9 +93,24 @@ class Hud(val m: Match) {
     var quitCb: (() -> Unit)? = null
     private var mmX = 0f; private var mmY = 0f; private var mmW = 0f; private var mmH = 0f; private var mmS = 1f
 
-    private fun screenToWorld(sx: Float, sy: Float): FloatArray {
-        val z = m.cam.zoom
-        return floatArrayOf((sx - W / 2 - m.cam.sx) / z + m.cam.x, (sy - H / 2 - m.cam.sy) / z + m.cam.y)
+    // ------------------------------------------------------------------ TPS controls
+    class AimPrev(val aim: Aim, val a: Float, val d: Float, val range: Float, val width: Float, val spread: Float, val area: Float, val superAim: Boolean)
+    /** ground preview of the current aim (drawn by the 3D scene) */
+    var aimPreview: AimPrev? = null
+    private val view get() = m.scene.view
+    private var firePid = -1; private var fireT = 0f
+    private var lookPid = -1
+    private var lastX = HashMap<Int, Float>(); private var lastY = HashMap<Int, Float>()
+    /** current aim (absolute sim angle + distance) after aim assist */
+    var aimA = 0f; var aimD = 0f
+    var locked: Body? = null
+    private val sens get() = 0.0052f / u
+
+    private fun rotateCam(id: Int, x: Float, y: Float) {
+        val lx = lastX[id] ?: x; val ly = lastY[id] ?: y
+        lastX[id] = x; lastY[id] = y
+        view.yaw += (x - lx) * sens
+        view.pitch = clamp(view.pitch + (y - ly) * sens * 0.6f, 0.05f, 0.95f)
     }
 
     fun touch(e: TouchEvt) {
@@ -113,50 +129,49 @@ class Hud(val m: Match) {
         if (m.over) return
         when (e.action) {
             TouchEvt.DOWN -> {
-                // buttons first
+                lastX[e.id] = e.x; lastY[e.id] = e.y
                 for (id in intArrayOf(B_PAUSE, B_PING, B_JUMP, B_GADGET, B_ITEM, B_USE, B_PREV, B_NEXT)) {
                     if (!btnVisible(id)) continue
                     val b = btnPos(id)
                     if (dist(e.x, e.y, b[0], b[1]) < b[2] * 1.25f) { btnPid[e.id] = id; pressed = id; onButton(id); return }
                 }
                 if (pingMode && pl != null && !pl.out) {
-                    // second tap: where to signal (minimap or world)
                     val wpt = if (e.x in mmX..(mmX + mmW) && e.y in mmY..(mmY + mmH)) floatArrayOf((e.x - mmX) / mmS, (e.y - mmY) / mmS)
-                    else screenToWorld(e.x, e.y)
+                    else view.pick(e.x, e.y) ?: floatArrayOf(pl.x + view.fwdX() * 400f, pl.y + view.fwdY() * 400f)
                     input.add(PlayerInput.PING, clamp(wpt[0], 0f, m.map.pxW), clamp(wpt[1], 0f, m.map.pxH))
                     pingMode = false
                     btnPid[e.id] = -1
                     return
                 }
                 if (pl != null && !pl.out) {
-                    if (dist(e.x, e.y, supX(), supY()) < supR() * 1.3f && sPid < 0) { sPid = e.id; sDx = 0f; sDy = 0f; sT = 0f; return }
-                    if (dist(e.x, e.y, atkX(), atkY()) < atkR() * 1.45f && aPid < 0) { aPid = e.id; aDx = 0f; aDy = 0f; aT = 0f; return }
-                    if (e.x > W * 0.55f && aPid < 0 && e.y > H * 0.35f) { aPid = e.id; aDx = 0f; aDy = 0f; aT = 0f; return }
+                    if (dist(e.x, e.y, supX(), supY()) < supR() * 1.3f && sPid < 0) { sPid = e.id; sT = 0f; return }
+                    if (dist(e.x, e.y, fireX(), fireY()) < fireR() * 1.3f && firePid < 0) {
+                        firePid = e.id; fireT = 0f
+                        computeAim(pl, false)
+                        input.add(PlayerInput.ATTACK, aimA, aimD)
+                        return
+                    }
                 }
-                if (e.x < W * 0.5f && mPid < 0) { mPid = e.id; mOx = e.x; mOy = e.y; mKx = e.x; mKy = e.y }
+                if (e.x < W * 0.42f && mPid < 0) { mPid = e.id; mOx = e.x; mOy = e.y; mKx = e.x; mKy = e.y; return }
+                if (lookPid < 0) lookPid = e.id
             }
             TouchEvt.MOVE -> {
                 when (e.id) {
                     mPid -> { mKx = e.x; mKy = e.y }
-                    aPid -> { aDx = e.x - atkX(); aDy = e.y - atkY(); clampStick(true) }
-                    sPid -> { sDx = e.x - supX(); sDy = e.y - supY(); clampStick(false) }
+                    lookPid, firePid, sPid -> rotateCam(e.id, e.x, e.y)
                 }
             }
             TouchEvt.UP -> {
+                lastX.remove(e.id); lastY.remove(e.id)
                 if (btnPid.remove(e.id) != null) { pressed = -1; return }
                 when (e.id) {
                     mPid -> { mPid = -1; input.mx = 0f; input.my = 0f }
-                    aPid -> { aPid = -1; releaseAttack(e.x > -9000f) }
+                    lookPid -> lookPid = -1
+                    firePid -> firePid = -1
                     sPid -> { sPid = -1; releaseSuper(e.x > -9000f) }
                 }
             }
         }
-    }
-
-    private fun clampStick(atk: Boolean) {
-        val r = if (atk) atkR() else supR() * 1.6f
-        if (atk) { val l = len(aDx, aDy); if (l > r) { aDx = aDx / l * r; aDy = aDy / l * r } }
-        else { val l = len(sDx, sDy); if (l > r) { sDx = sDx / l * r; sDy = sDy / l * r } }
     }
 
     private fun hitRect(id: Int, x: Float, y: Float): Boolean {
@@ -182,7 +197,7 @@ class Hud(val m: Match) {
             B_PAUSE -> { if (m.cfg.net) menuOpen = true else m.paused = true; Sfx.play(Sfx.CLICK) }
             B_PING -> { pingMode = !pingMode; pingHintT = 0f; Sfx.play(Sfx.CLICK) }
             B_JUMP -> input.add(PlayerInput.JUMP)
-            B_GADGET -> if (pl != null) input.add(PlayerInput.GADGET, if (aPid >= 0 && len(aDx, aDy) > 10f) atan2(aDy, aDx) else pl.face)
+            B_GADGET -> if (pl != null) { computeAim(pl, false); input.add(PlayerInput.GADGET, aimA) }
             B_ITEM -> input.add(PlayerInput.ITEM)
             B_USE -> input.add(PlayerInput.INTERACT)
             B_PREV, B_NEXT -> cycleSpectate(if (id == B_NEXT) 1 else -1)
@@ -196,42 +211,45 @@ class Hud(val m: Match) {
         m.spectate = alive[((i + d) % alive.size + alive.size) % alive.size]
     }
 
-    private fun aimMag(): Float = len(aDx, aDy) / atkR()
-    private fun superMag(): Float = len(sDx, sDy) / (supR() * 1.6f)
-
-    private fun releaseAttack(valid: Boolean) {
-        val pl = p ?: return
-        if (!valid || pl.out) return
+    /** Crosshair aim with aim assist: returns angle + distance in [aimA]/[aimD]. */
+    private fun computeAim(pl: Fighter, sup: Boolean) {
         val w = pl.currentWeapon()
-        val mag = aimMag()
-        if (mag < 0.22f) {
-            if (aT < 0.4f) autoFire(pl, w.range, w.aim, false)
-        } else if (!w.auto) {
-            val a = atan2(aDy, aDx)
-            input.add(PlayerInput.ATTACK, a, mag * w.range * T * pl.rangeMul())
+        val range = (if (sup) pl.hero.superRange else w.range) * T * (if (sup) 1f else pl.rangeMul())
+        val aim = if (sup) pl.hero.superAim else w.aim
+        val yaw = view.yaw
+        val gp = view.pick(view.crossX(), view.crossY(), range * 1.6f + 600f)
+        var d = if (gp != null) dist(pl.x, pl.y, gp[0], gp[1]) else range
+        d = clamp(d, 40f, range)
+        var best: Body? = null; var bs = 9f
+        for (b in m.hittables) {
+            if (b === pl || !m.isEnemy(pl.team, b) || b is Breakable || b is Ball) continue
+            if (b is Fighter && !m.canSee(pl, b)) continue
+            if (b is Vehicle && b.driver == null) continue
+            val bd = dist(pl.x, pl.y, b.x, b.y)
+            if (bd > range * 1.15f || bd < 1f) continue
+            val da = abs(com.starguys.battle.core.angleDiff(yaw, ang(pl.x, pl.y, b.x, b.y)))
+            val lim = 0.2f + 26f / bd
+            if (da > lim) continue
+            val score = da / lim + bd / range * 0.3f
+            if (score < bs) { bs = score; best = b }
+        }
+        locked = best
+        if (best != null) {
+            val bd = dist(pl.x, pl.y, best.x, best.y)
+            val lead = if (aim == Aim.LOB) 0.6f else bd / 1100f
+            val tx = best.x + best.vx * lead * 0.7f; val ty = best.y + best.vy * lead * 0.7f
+            aimA = ang(pl.x, pl.y, tx, ty); aimD = dist(pl.x, pl.y, tx, ty)
+        } else {
+            aimA = yaw; aimD = if (aim == Aim.LOB || aim == Aim.POINT) d else range
         }
     }
 
     private fun releaseSuper(valid: Boolean) {
         val pl = p ?: return
         if (!valid || pl.out || !pl.ready) return
-        val h = pl.hero
-        val mag = superMag()
-        if (mag < 0.22f) autoFire(pl, h.superRange, h.superAim, true)
-        else input.add(PlayerInput.SUPER, atan2(sDy, sDx), mag * h.superRange * T)
-    }
-
-    private fun autoFire(pl: Fighter, rangeTiles: Float, aim: Aim, sup: Boolean) {
-        val tg = autoTarget(pl, rangeTiles * T * pl.rangeMul() * 1.05f)
-        var a = pl.face; var d = rangeTiles * T * 0.6f
-        if (tg != null) {
-            d = dist(pl.x, pl.y, tg.x, tg.y)
-            val lead = if (aim == Aim.LOB) 0.6f else d / 1000f
-            val tx = tg.x + tg.vx * lead * 0.7f; val ty = tg.y + tg.vy * lead * 0.7f
-            a = ang(pl.x, pl.y, tx, ty); d = dist(pl.x, pl.y, tx, ty)
-        }
-        if (sup) { if (aim == Aim.SELF) input.add(PlayerInput.SUPER, pl.face, 0f) else input.add(PlayerInput.SUPER, a, d) }
-        else input.add(PlayerInput.ATTACK, a, d)
+        computeAim(pl, true)
+        if (pl.hero.superAim == Aim.SELF) input.add(PlayerInput.SUPER, pl.face, 0f)
+        else input.add(PlayerInput.SUPER, aimA, aimD)
     }
 
     fun autoTarget(pl: Fighter, range: Float): Body? {
@@ -254,7 +272,8 @@ class Hud(val m: Match) {
         if (blindT > 0) blindT -= dt
         if (bigT > 0) bigT -= dt
         pingHintT += dt
-        aT += dt; sT += dt
+        fireT += dt; sT += dt
+        aimPreview = null
         val pl = p
         if (pl == null || pl.out) { input.mx = 0f; input.my = 0f; input.aiming = false; input.hold = false; pingMode = false; return }
         if (mPid >= 0) {
@@ -264,65 +283,31 @@ class Hud(val m: Match) {
             if (l > r) { mOx = mKx - dx / l * r; mOy = mKy - dy / l * r; dx = mKx - mOx; dy = mKy - mOy }
             val mag = clamp(len(dx, dy) / r, 0f, 1f)
             if (mag < 0.12f) { input.mx = 0f; input.my = 0f } else {
-                val a = atan2(dy, dx)
-                input.mx = cosf(a) * mag.coerceAtLeast(0.55f); input.my = sinf(a) * mag.coerceAtLeast(0.55f)
+                val k = mag.coerceAtLeast(0.55f) / maxOf(len(dx, dy), 1f)
+                val fwd = -dy * k; val rt = dx * k
+                val y = view.yaw
+                input.mx = cosf(y) * fwd - sinf(y) * rt; input.my = sinf(y) * fwd + cosf(y) * rt
             }
         } else { input.mx = 0f; input.my = 0f }
-        // aiming turns the hero; automatic weapons fire while held
         input.aiming = false; input.hold = false
         val w = pl.currentWeapon()
-        if (aPid >= 0 && aimMag() > 0.22f) {
-            input.aiming = true; input.aim = atan2(aDy, aDx)
-            if (w.auto) { input.hold = true; input.holdDist = aimMag() * w.range * T }
-        } else if (aPid >= 0 && aT > 0.4f && w.auto) {
-            val tg = autoTarget(pl, w.range * T)
-            if (tg != null) { input.aiming = true; input.hold = true; input.aim = ang(pl.x, pl.y, tg.x, tg.y); input.holdDist = dist(pl.x, pl.y, tg.x, tg.y) }
+        if (firePid >= 0) {
+            computeAim(pl, false)
+            input.aiming = true; input.aim = aimA
+            input.hold = true; input.holdDist = aimD
+            if (w.aim != Aim.LINE) aimPreview = AimPrev(w.aim, aimA, aimD, w.range * T * pl.rangeMul(), w.width, w.spread, if (w.aim == Aim.LOB) 1.1f * T else 0f, false)
+        } else locked = null
+        if (sPid >= 0 && pl.ready) {
+            computeAim(pl, true)
+            val h = pl.hero
+            input.aiming = h.superAim != Aim.SELF; input.aim = aimA
+            aimPreview = AimPrev(h.superAim, aimA, aimD, h.superRange * T, 34f, 40f, if (h.superAim == Aim.LOB || h.superAim == Aim.POINT) 2f * T else 0f, true)
         }
-        if (sPid >= 0 && superMag() > 0.22f) { input.aiming = true; input.aim = atan2(sDy, sDx) }
         labelT -= dt
         if (labelT <= 0f) { useLabel = m.interactLabel(pl); labelT = 0.15f }
     }
 
-    // ------------------------------------------------------------------ world-space overlays (aim indicators)
-    fun drawWorld(c: Canvas) {
-        val pl = p ?: return
-        if (pl.out) return
-        val px = pl.vehicle?.x ?: pl.x; val py = (pl.vehicle?.y ?: pl.y) - pl.z * ZS * 0.2f
-        if (aPid >= 0 && aimMag() > 0.22f) {
-            val w = pl.currentWeapon()
-            drawAim(c, px, py, atan2(aDy, aDx), aimMag(), w.aim, w.range * T * pl.rangeMul(), w.width, w.spread, 0xFFFFFFFF.toInt(), if (w.aim == Aim.LOB) 1.1f * T else 0f)
-        }
-        if (sPid >= 0 && superMag() > 0.22f && pl.ready) {
-            val h = pl.hero
-            drawAim(c, px, py, atan2(sDy, sDx), superMag(), h.superAim, h.superRange * T, 34f, 40f, 0xFFFFE14D.toInt(), if (h.superAim == Aim.LOB || h.superAim == Aim.POINT) 2f * T else 0f)
-        } else if (sPid >= 0 && pl.ready && pl.hero.superAim == Aim.SELF) {
-            G.ring(c, px, py, pl.hero.superRange * T, 4f, 0x88FFE14D.toInt())
-        }
-    }
-
-    private fun drawAim(c: Canvas, x: Float, y: Float, a: Float, mag: Float, aim: Aim, range: Float, width: Float, spread: Float, col: Int, areaR: Float) {
-        val fill = G.alpha(col, 0.28f)
-        c.save(); c.translate(x, y)
-        when (aim) {
-            Aim.LINE -> {
-                c.rotate(Math.toDegrees(a.toDouble()).toFloat())
-                G.rrect(c, 20f, -width, range, width, width, fill, false)
-            }
-            Aim.CONE, Aim.ARC -> {
-                val sp = if (spread > 0f) spread else 30f
-                G.pie(c, 0f, 0f, range, Math.toDegrees(a.toDouble()).toFloat() - sp / 2, sp, fill)
-            }
-            Aim.LOB, Aim.POINT -> {
-                val d = mag * range
-                val tx = cosf(a) * d; val ty = sinf(a) * d
-                for (k in 1..8) { val t = k / 9f; G.circle(c, tx * t, ty * t - sinf(t * 3.14f) * d * 0.25f, 4f, G.alpha(col, 0.6f), false) }
-                G.circle(c, tx, ty, maxOf(areaR, 30f), fill, false)
-                G.ring(c, tx, ty, maxOf(areaR, 30f), 3f, G.alpha(col, 0.7f))
-            }
-            Aim.SELF -> G.ring(c, 0f, 0f, range, 4f, G.alpha(col, 0.6f))
-        }
-        c.restore()
-    }
+    fun drawWorld(c: Canvas) {}
 
     // ------------------------------------------------------------------ screen-space HUD
     fun draw(c: Canvas) {
@@ -341,7 +326,9 @@ class Hud(val m: Match) {
             c.drawRect(0f, 0f, W, H, G.stroke)
             G.text(c, "MIROIR !", W / 2, H * 0.3f, 44f * u, 0xFFE0B0FF.toInt())
         }
+        drawOverlays(c)
         drawMinimap(c)
+        if (p?.out == false) drawCompass(c)
         // pause & ping
         drawRoundBtn(c, B_PAUSE, 0xFF5B4B8A.toInt()) { x, y, s -> G.rect(c, x - s * 0.45f, y - s * 0.5f, x - s * 0.12f, y + s * 0.5f, G.WHITE, false); G.rect(c, x + s * 0.12f, y - s * 0.5f, x + s * 0.45f, y + s * 0.5f, G.WHITE, false) }
         if (pl != null && !pl.out) {
@@ -388,57 +375,183 @@ class Hud(val m: Match) {
         if (m.paused || menuOpen) drawPause(c)
     }
 
+    private val pt = FloatArray(2)
+
+    /** Names, health bars, damage numbers and pings projected from the 3D world. */
+    private fun drawOverlays(c: Canvas) {
+        val v = view
+        val pl = p
+        for (f in m.fighters) {
+            if (f.out || f === pl && !pl.out || f.vehicle != null) continue
+            if (!m.visibleToPlayer(f)) continue
+            if (f.invisT > 0 && f.hero.id == 3 && pl != null && m.isEnemy(pl.team, f) && f.revealT <= 0) continue
+            if (m.mode.hideBars(f, pl) || (f.disguise >= 0 && pl != null && m.isEnemy(pl.team, f))) continue
+            val d = v.depth(f.x, f.y, f.z)
+            if (d > 2200f) continue
+            if (!v.project(f.x, f.y, f.z + f.bodyH + 22f, pt)) continue
+            val s = clamp(380f / d, 0.45f, 1.25f) * u
+            val ally = pl != null && !m.isEnemy(pl.team, f)
+            val col = if (ally) 0xFF38BDF8.toInt() else 0xFFF43F5E.toInt()
+            val bw = 80f * s; val bh = 9f * s
+            val l = pt[0] - bw / 2; val t = pt[1]
+            G.rrect(c, l - 2f * s, t - 2f * s, l + bw + 2f * s, t + bh + 2f * s, 5f * s, 0xAA0F172A.toInt(), false)
+            if (m.mode.percentMode) G.text(c, "${f.dmgPct.toInt()}%", pt[0], t + bh, 20f * s, G.mix(G.WHITE, 0xFFFF3D3D.toInt(), clamp(f.dmgPct / 150f, 0f, 1f)))
+            else {
+                G.rrect(c, l, t, l + bw * clamp(f.hp / f.maxHp, 0f, 1f), t + bh, 4f * s, col, false)
+                if (f.shieldHp > 0f) G.rect(c, l, t, l + bw * clamp(f.shieldHp / 2000f, 0f, 1f), t + bh * 0.4f, 0xFF93C5FD.toInt(), false)
+            }
+            G.text(c, f.name, pt[0], t - 5f * s, 16f * s, if (ally) 0xFFBAE6FD.toInt() else G.WHITE)
+            if (f.ready && ally) G.circle(c, l - 9f * s, t + bh / 2, 5f * s, 0xFFFFE14D.toInt())
+        }
+        for (mb in m.mobs) {
+            if (!mb.alive || mb.isBoss || mb.hp >= mb.maxHp || !m.visibleToPlayer(mb)) continue
+            val d = v.depth(mb.x, mb.y, mb.z); if (d > 1800f) continue
+            if (!v.project(mb.x, mb.y, mb.z + mb.bodyH + 14f, pt)) continue
+            val s = clamp(380f / d, 0.45f, 1.2f) * u
+            val bw = mb.radius * 2.4f * s
+            G.rect(c, pt[0] - bw / 2, pt[1], pt[0] + bw / 2, pt[1] + 6f * s, 0xAA0F172A.toInt(), false)
+            G.rect(c, pt[0] - bw / 2, pt[1], pt[0] - bw / 2 + bw * (mb.hp / mb.maxHp).coerceIn(0f, 1f), pt[1] + 6f * s, 0xFFF43F5E.toInt(), false)
+        }
+        for (vh in m.vehicles) {
+            if (!vh.alive || vh.kind == Vehicle.COASTER) continue
+            val d = v.depth(vh.x, vh.y, vh.z); if (d > 1600f) continue
+            if (!v.project(vh.x, vh.y, vh.z + (if (vh.kind == Vehicle.BALLOON) 240f else 100f), pt)) continue
+            val s = clamp(380f / d, 0.45f, 1.2f) * u
+            val dr = vh.driver
+            if (dr == null && d < 700f) G.text(c, Vehicle.NAMES[vh.kind], pt[0], pt[1], 15f * s, 0xDDFFFFFF.toInt())
+            else if (dr != null && dr !== pl) {
+                G.rect(c, pt[0] - 40f * s, pt[1], pt[0] + 40f * s, pt[1] + 7f * s, 0xAA0F172A.toInt(), false)
+                G.rect(c, pt[0] - 40f * s, pt[1], pt[0] - 40f * s + 80f * s * (vh.hp / vh.maxHp).coerceIn(0f, 1f), pt[1] + 7f * s, 0xFFFFD23F.toInt(), false)
+                G.text(c, dr.name, pt[0], pt[1] - 4f * s, 15f * s, G.WHITE)
+            }
+        }
+        for (q in m.fx.ps) {
+            if (q.kind != Fx.NUM && q.kind != Fx.TEXT) continue
+            if (!v.project(q.x, q.y, q.z, pt)) continue
+            val k = q.life / q.max
+            val d = v.depth(q.x, q.y, q.z)
+            val s = clamp(420f / d, 0.5f, 1.5f) * u * (if (q.kind == Fx.NUM && k > 0.8f) 1f + (k - 0.8f) * 3f else 1f)
+            G.fade = minOf(1f, k * 2.5f)
+            G.text(c, q.text, pt[0], pt[1], q.size * 1.2f * s, q.color)
+            G.fade = 1f
+        }
+        val myTeam = pl?.team
+        for (pg in m.pings) {
+            if (myTeam != null && pg.team != myTeam) continue
+            val h = maxOf(0f, m.map.groundAt(pg.x, pg.y))
+            val on = v.project(pg.x, pg.y, h + 120f, pt)
+            var sx = pt[0]; var sy = pt[1]
+            if (!on) { sx = if (com.starguys.battle.core.angleDiff(view.yaw, ang(view.camX, view.camY, pg.x, pg.y)) > 0) W - 40f * u else 40f * u; sy = H / 2 }
+            sx = clamp(sx, 40f * u, W - 40f * u); sy = clamp(sy, 60f * u, H - 60f * u)
+            G.fade = clamp(pg.life, 0f, 1f)
+            G.circle(c, sx, sy, 20f * u, 0xFFF59E0B.toInt()); G.text(c, "!", sx, sy + 10f * u, 28f * u, G.WHITE)
+            if (pl != null) G.text(c, "${(dist(pl.x, pl.y, pg.x, pg.y) / 32f).toInt()} m", sx, sy + 40f * u, 17f * u, 0xFFFDE68A.toInt())
+            G.fade = 1f
+        }
+    }
+
+    private fun drawCompass(c: Canvas) {
+        val cw = 420f * u; val cx = W / 2; val y = 74f * u
+        G.rrect(c, cx - cw / 2, y - 16f * u, cx + cw / 2, y + 16f * u, 14f * u, 0x660F172A, false)
+        val labels = arrayOf("E", "SE", "S", "SO", "O", "NO", "N", "NE")
+        for (k in 0 until 8) {
+            val a = k * 0.7854f
+            val da = com.starguys.battle.core.angleDiff(view.yaw, a)
+            if (abs(da) > 1.2f) continue
+            val x = cx + da / 1.2f * cw / 2
+            G.fade = 1f - abs(da) / 1.2f * 0.6f
+            G.text(c, labels[k], x, y + 7f * u, (if (labels[k].length == 1) 21f else 15f) * u, if (labels[k] == "N") 0xFFFBBF24.toInt() else G.WHITE)
+        }
+        G.fade = 1f
+        G.poly(c, 0xFFFBBF24.toInt(), true, cx, y + 14f * u, cx - 6f * u, y + 22f * u, cx + 6f * u, y + 22f * u)
+    }
+
     private fun drawSticks(c: Canvas, pl: Fighter) {
         G.ow = 3f * u
+        // crosshair
+        val cx = view.crossX(); val cy = view.crossY()
+        val lk = locked != null
+        val cc = if (lk) 0xFFF43F5E.toInt() else 0xEEFFFFFF.toInt()
+        val g = (if (firePid >= 0) 13f else 9f) * u
+        for (k in 0 until 4) {
+            val a = k * 1.5708f
+            G.line(c, cx + cosf(a) * g, cy + sinf(a) * g, cx + cosf(a) * (g + 11f * u), cy + sinf(a) * (g + 11f * u), 3f * u, cc)
+        }
+        G.circle(c, cx, cy, 2.5f * u, cc, false)
+        if (lk) G.ring(c, cx, cy, 26f * u, 2f * u, 0x88F43F5E.toInt())
         // move stick
         if (mPid >= 0) {
             G.circle(c, mOx, mOy, 70f * u * sizeMul, 0x33FFFFFF, false)
             G.ring(c, mOx, mOy, 70f * u * sizeMul, 3f * u, 0x66FFFFFF)
             G.circle(c, mKx, mKy, 34f * u * sizeMul, 0xAAFFFFFF.toInt())
         } else {
-            G.text(c, "◀ ▶", 150f * u, H - 90f * u, 30f * u, 0x55FFFFFF, outline = false)
+            G.circle(c, 170f * u, H - 150f * u, 70f * u * sizeMul, 0x1AFFFFFF, false)
+            G.ring(c, 170f * u, H - 150f * u, 70f * u * sizeMul, 2f * u, 0x44FFFFFF)
         }
-        // attack stick
+        // fire button
         val w = pl.currentWeapon()
-        val ax = atkX(); val ay = atkY(); val ar = atkR()
-        G.circle(c, ax, ay, ar, 0x33FF5E7E, false)
-        G.ring(c, ax, ay, ar, 3f * u, 0x88FF9AB0.toInt())
-        val kx = ax + aDx; val ky = ay + aDy
+        val fx = fireX(); val fy = fireY(); val fr = fireR()
+        val ok = pl.canAttack() || pl.modeWeapon != null
+        G.glow(c, fx, fy, fr * 1.5f, 0x55F43F5E)
+        G.circle(c, fx, fy + 4f * u, fr, 0xFF7F1D1D.toInt())
         G.depth = true
-        G.circle(c, if (aPid >= 0) kx else ax, if (aPid >= 0) ky else ay, ar * 0.5f, if (pl.canAttack() || pl.modeWeapon != null) 0xFFF43F5E.toInt() else 0xFF8A6A78.toInt())
+        G.circle(c, fx, fy + (if (firePid >= 0) 3f * u else 0f), fr, if (ok) 0xFFF43F5E.toInt() else 0xFF8A6A78.toInt())
         G.depth = false
-        if (pl.weapon != null || pl.modeWeapon != null) Icons.weapon(c, w.id, if (aPid >= 0) kx else ax, if (aPid >= 0) ky else ay, ar * 0.32f)
-        else G.star(c, if (aPid >= 0) kx else ax, if (aPid >= 0) ky else ay, ar * 0.22f, ar * 0.1f, 4, 0.78f, G.WHITE, false)
-        // ammo text for pickup weapons
-        if (pl.weapon != null && pl.modeWeapon == null) G.text(c, "${pl.wAmmo}", ax + ar * 0.8f, ay + ar * 0.95f, 22f * u, 0xFFFFE14D.toInt())
-        if (pl.unarmed && pl.weapon == null) G.text(c, "Sans arme", ax, ay + ar + 26f * u, 18f * u, 0xFFFFC94D.toInt())
+        val iy = fy + (if (firePid >= 0) 3f * u else 0f)
+        if (pl.weapon != null || pl.modeWeapon != null) Icons.weapon(c, w.id, fx, iy, fr * 0.42f)
+        else {
+            G.ring(c, fx, iy, fr * 0.34f, 4f * u, G.WHITE)
+            G.line(c, fx - fr * 0.5f, iy, fx + fr * 0.5f, iy, 4f * u, G.WHITE); G.line(c, fx, iy - fr * 0.5f, fx, iy + fr * 0.5f, 4f * u, G.WHITE)
+        }
+        // ammo
+        if (pl.weapon != null && pl.modeWeapon == null) {
+            G.rrect(c, fx - 60f * u, fy + fr + 6f * u, fx + 60f * u, fy + fr + 34f * u, 12f * u, 0xAA0F172A.toInt(), false)
+            G.text(c, "${pl.wAmmo}", fx, fy + fr + 29f * u, 22f * u, 0xFFFFE14D.toInt())
+        } else if (pl.modeWeapon == null) {
+            val aw = 30f * u
+            for (i in 0 until 3) {
+                val fill = clamp(pl.ammo - i, 0f, 1f)
+                val ax = fx - 50f * u + i * (aw + 5f * u)
+                G.rrect(c, ax, fy + fr + 10f * u, ax + aw, fy + fr + 20f * u, 4f * u, 0xAA0F172A.toInt(), false)
+                G.rrect(c, ax, fy + fr + 10f * u, ax + aw * fill, fy + fr + 20f * u, 4f * u, if (fill >= 1f) 0xFFFB923C.toInt() else 0xFF9A5A2A.toInt(), false)
+            }
+        }
+        if (pl.unarmed && pl.weapon == null) G.text(c, "Sans arme", fx, fy - fr - 12f * u, 18f * u, 0xFFFFC94D.toInt())
         // super
         val sx = supX(); val sy = supY(); val sr = supR()
         val ch = pl.superCharge
-        G.circle(c, sx, sy, sr, 0x66000000, false)
+        G.circle(c, sx, sy, sr, 0x880F172A.toInt(), false)
         G.pie(c, sx, sy, sr, -90f, 360f * ch, if (pl.ready) 0xFFFFD23F.toInt() else 0xAA9C7A20.toInt())
         G.ring(c, sx, sy, sr, 3f * u, if (pl.ready) 0xFFFFF3B0.toInt() else 0x88FFFFFF.toInt())
         if (pl.ready) G.ring(c, sx, sy, sr * (1.15f + 0.08f * sinf(m.time * 8f)), 3f * u, 0x88FFE14D.toInt())
-        val skx = if (sPid >= 0) sx + sDx * 0.6f else sx; val sky = if (sPid >= 0) sy + sDy * 0.6f else sy
-        G.star(c, skx, sky, sr * 0.5f, sr * 0.22f, 5, 0f, if (pl.ready) G.WHITE else 0x88FFFFFF.toInt())
-        // other buttons
+        G.star(c, sx, sy, sr * 0.5f, sr * 0.22f, 5, 0f, if (pl.ready) G.WHITE else 0x88FFFFFF.toInt())
         if (btnVisible(B_GADGET)) drawRoundBtn(c, B_GADGET, 0xFF35C6F4.toInt()) { x, y, s -> Icons.gadget(c, pl.gadget!!.id, x, y, s * 0.7f); G.text(c, "${pl.gadgetCharges}", x + s * 0.9f, y + s * 1.0f, 18f * u, G.WHITE) }
         if (btnVisible(B_ITEM)) drawRoundBtn(c, B_ITEM, 0xFFFF8CC6.toInt()) { x, y, s -> Icons.item(c, pl.items[0], x, y, s * 0.7f); if (pl.items.size > 1) G.text(c, "×${pl.items.size}", x + s * 0.9f, y + s, 18f * u, G.WHITE) }
-        drawRoundBtn(c, B_JUMP, 0xFF7CC243.toInt()) { x, y, s -> G.poly(c, G.WHITE, true, x, y - s * 0.55f, x + s * 0.5f, y + s * 0.1f, x + s * 0.18f, y + s * 0.1f, x + s * 0.18f, y + s * 0.5f, x - s * 0.18f, y + s * 0.5f, x - s * 0.18f, y + s * 0.1f, x - s * 0.5f, y + s * 0.1f) }
+        drawRoundBtn(c, B_JUMP, 0xFF22C55E.toInt()) { x, y, s -> G.poly(c, G.WHITE, true, x, y - s * 0.55f, x + s * 0.5f, y + s * 0.1f, x + s * 0.18f, y + s * 0.1f, x + s * 0.18f, y + s * 0.5f, x - s * 0.18f, y + s * 0.5f, x - s * 0.18f, y + s * 0.1f, x - s * 0.5f, y + s * 0.1f) }
         val lab = useLabel
         if (lab != null) drawRoundBtn(c, B_USE, 0xFFFF9A3D.toInt()) { x, y, s -> G.text(c, lab, x, y + s * 0.18f, minOf(s * 0.48f, 2.2f * s / maxOf(1, lab.length) * 1.6f), G.WHITE) }
-        // parachute & item hints
-        if (pl.parachutes > 0) { Icons.gadget(c, Gadgets.PARACHUTE, W - 318f * u, H - 330f * u, 16f * u); G.text(c, "×${pl.parachutes}", W - 290f * u, H - 322f * u, 16f * u, G.WHITE) }
-        // own HP big bar (bottom-left)
-        val hw = 260f * u; val hx = 24f * u; val hy = H - 40f * u
-        G.rrect(c, hx, hy, hx + hw, hy + 22f * u, 10f * u, 0xCC1B1530.toInt())
+        if (pl.parachutes > 0) { Icons.gadget(c, Gadgets.PARACHUTE, W - 318f * u, H - 340f * u, 16f * u); G.text(c, "×${pl.parachutes}", W - 290f * u, H - 332f * u, 16f * u, G.WHITE) }
+        // Fortnite-style health & shield (bottom centre)
+        val hw = 380f * u; val hx = W / 2 - hw / 2; val hy = H - 46f * u
         if (m.mode.percentMode) {
-            G.text(c, "${pl.dmgPct.toInt()}%   ${"♥".repeat(pl.stocks.coerceAtLeast(0))}", hx + hw / 2, hy + 18f * u, 20f * u, G.mix(G.WHITE, 0xFFFF3D3D.toInt(), clamp(pl.dmgPct / 150f, 0f, 1f)))
+            G.rrect(c, hx, hy, hx + hw, hy + 26f * u, 10f * u, 0xCC0F172A.toInt())
+            G.text(c, "${pl.dmgPct.toInt()}%   ${"♥".repeat(pl.stocks.coerceAtLeast(0))}", W / 2, hy + 21f * u, 22f * u, G.mix(G.WHITE, 0xFFFF3D3D.toInt(), clamp(pl.dmgPct / 150f, 0f, 1f)))
         } else {
-            G.vgrad(c, hx + 3f * u, hy + 3f * u, hx + 3f * u + (hw - 6f * u) * clamp(pl.hp / pl.maxHp, 0.02f, 1f), hy + 19f * u, 8f * u, 0xFF86EFAC.toInt(), 0xFF16A34A.toInt())
-            G.text(c, "${pl.hp.toInt()}", hx + hw / 2, hy + 18f * u, 17f * u, G.WHITE)
+            if (pl.shieldHp > 0f) {
+                G.rrect(c, hx, hy - 16f * u, hx + hw, hy - 4f * u, 6f * u, 0xCC0F172A.toInt(), false)
+                G.vgrad(c, hx + 2f * u, hy - 14f * u, hx + 2f * u + (hw - 4f * u) * clamp(pl.shieldHp / 2000f, 0f, 1f), hy - 6f * u, 4f * u, 0xFF93C5FD.toInt(), 0xFF2563EB.toInt())
+            }
+            G.rrect(c, hx, hy, hx + hw, hy + 26f * u, 10f * u, 0xCC0F172A.toInt())
+            G.vgrad(c, hx + 3f * u, hy + 3f * u, hx + 3f * u + (hw - 6f * u) * clamp(pl.hp / pl.maxHp, 0.02f, 1f), hy + 23f * u, 8f * u, 0xFF86EFAC.toInt(), 0xFF16A34A.toInt())
+            G.text(c, "${pl.hp.toInt()} / ${pl.maxHp.toInt()}", W / 2, hy + 20f * u, 18f * u, G.WHITE)
         }
-        G.text(c, "${pl.hero.name}", hx, hy - 8f * u, 20f * u, G.WHITE, android.graphics.Paint.Align.LEFT)
+        G.text(c, pl.hero.name, hx, hy - 22f * u, 20f * u, G.WHITE, android.graphics.Paint.Align.LEFT)
+        // low health vignette
+        if (!m.mode.percentMode && pl.hp < pl.maxHp * 0.3f) {
+            G.stroke.shader = null; G.stroke.strokeWidth = 40f * u; G.stroke.color = G.alpha(0xFFDC2626.toInt(), 0.25f + 0.15f * sinf(m.time * 6f))
+            c.drawRect(0f, 0f, W, H, G.stroke)
+        }
+        if (m.stormR > 0f && dist(pl.x, pl.y, m.stormX, m.stormY) > m.stormR) G.rect(c, 0f, 0f, W, H, 0x33A855F7, false)
     }
 
     private fun drawRoundBtn(c: Canvas, id: Int, col: Int, icon: (Float, Float, Float) -> Unit) {
@@ -491,21 +604,7 @@ class Hud(val m: Match) {
         }
     }
 
-    private fun drawEdgeMarkers(c: Canvas, pl: Fighter) {
-        val z = m.cam.zoom
-        for (f in m.fighters) {
-            if (f.out || !m.isEnemy(pl.team, f) || f.revealT <= 0f) continue
-            val sx = (f.x - m.cam.x) * z + W / 2; val sy = (f.y - m.cam.y) * z + H / 2
-            if (sx in 0f..W && sy in 0f..H) continue
-            val ex = clamp(sx, 30f * u, W - 30f * u); val ey = clamp(sy, 30f * u, H - 30f * u)
-            G.circle(c, ex, ey, 12f * u, 0xFFFF5E7E.toInt())
-        }
-        for (pg in m.pings) {
-            val sx = (pg.x - m.cam.x) * z + W / 2; val sy = (pg.y - m.cam.y) * z + H / 2
-            val ex = clamp(sx, 30f * u, W - 30f * u); val ey = clamp(sy, 30f * u, H - 30f * u)
-            G.circle(c, ex, ey, 14f * u, 0xFFFFC23D.toInt()); G.text(c, "!", ex, ey + 8f * u, 22f * u, G.WHITE)
-        }
-    }
+    private fun drawEdgeMarkers(c: Canvas, pl: Fighter) {}
 
     private fun buildMinimap() {
         val mp = m.map

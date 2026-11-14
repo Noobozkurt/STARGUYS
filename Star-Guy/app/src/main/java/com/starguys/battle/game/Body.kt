@@ -197,7 +197,7 @@ abstract class Actor(m: Match) : Body(m) {
             burnT -= dt
             val src = burnSrc
             hurt(burnDps * dt, src ?: this, 0f, 0f)
-            if (com.starguys.battle.core.chance(dt * 8f)) m.fx.flameBit(x, y - z * ZS - bodyH * 0.6f)
+            if (com.starguys.battle.core.chance(dt * 8f)) m.fx.flameBit(x, y, z + bodyH * 0.6f)
         }
     }
 

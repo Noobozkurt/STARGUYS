@@ -74,7 +74,7 @@ class Vehicle(m: Match, val kind: Int, px: Float, py: Float) : Body(m) {
                         if (dd < bd) { bd = dd; best = o }
                     }
                     val b = best
-                    if (b != null) { held = b; b.heldBy = this; m.sound(Sfx.THUD, x, y); m.fx.text(b.x, b.y - 80f, "ATTRAPÉ !", 0xFFFFE14D.toInt()) }
+                    if (b != null) { held = b; b.heldBy = this; m.sound(Sfx.THUD, x, y); m.fx.text(b.x, b.y, Fx.GND + 80f, "ATTRAPÉ !", 0xFFFFE14D.toInt()) }
                 }
             }
         }
@@ -113,7 +113,7 @@ class Vehicle(m: Match, val kind: Int, px: Float, py: Float) : Body(m) {
                 val sp = len(vx, vy)
                 val nsp = sp + clamp(target - sp, -200f * dt, 420f * dt)
                 vx = cosf(heading) * nsp; vy = sinf(heading) * nsp
-                if (input && com.starguys.battle.core.chance(0.5f)) m.fx.smoke(x - cosf(heading) * 30f, y - sinf(heading) * 30f, 1, 0xFFFF9A3D.toInt())
+                if (input && com.starguys.battle.core.chance(0.5f)) m.fx.smoke(x - cosf(heading) * 30f, y - sinf(heading) * 30f, Fx.GND, 1, 0xFFFF9A3D.toInt())
             }
             DUCK -> {
                 val water = m.map.t(tileX(), tileY()) == Tl.WATER
@@ -128,7 +128,7 @@ class Vehicle(m: Match, val kind: Int, px: Float, py: Float) : Body(m) {
         moveCollide(dt)
         if (hitWall && kind == UNICYCLE && fast > 380f && d != null) {
             m.exitVehicle(d); d.ragdollT = 1f; d.vz = 400f; d.vx = -cosf(heading) * 300f; d.vy = -sinf(heading) * 300f
-            m.fx.text(x, y - 80f, "OUPS !", 0xFFFF9A3D.toInt()); m.sound(Sfx.BOING, x, y)
+            m.fx.text(x, y, Fx.GND + 80f, "OUPS !", 0xFFFF9A3D.toInt()); m.sound(Sfx.BOING, x, y)
             vx = 0f; vy = 0f
         }
         if (hitWall && kind == BUMPER) { val dot = vx * wallNx + vy * wallNy; vx -= 1.6f * dot * wallNx; vy -= 1.6f * dot * wallNy }
@@ -194,7 +194,7 @@ class Vehicle(m: Match, val kind: Int, px: Float, py: Float) : Body(m) {
         if (dr == null && atk == null) return false
         hp -= d * (if (kind == TANK) 0.6f else 1f); flash = 0.1f
         if (atk != null && dr != null) atk.onDealt(d, dr)
-        m.fx.number(x, y - z * ZS - 70f, d, 0xFFFFD23F.toInt())
+        m.fx.number(x, y, z + 70f, d, 0xFFFFD23F.toInt())
         vx += kx * 0.2f / mass; vy += ky * 0.2f / mass
         if (hp <= 0f) destroy()
         return true
@@ -206,7 +206,7 @@ class Vehicle(m: Match, val kind: Int, px: Float, py: Float) : Body(m) {
         if (d != null) { m.exitVehicle(d); d.vz = 400f; d.ragdollT = 0.9f; d.hurt(400f, m.envBody, 0f, 0f) }
         held?.let { it.heldBy = null }; held = null
         m.explode(x, y, 1.4f * T, 600f, m.envBody, TEAM_NEUTRAL, 600f, tiles = false)
-        m.fx.debris(x, y - 30f, 0xFF8A93A8.toInt())
+        m.fx.debris(x, y, Fx.GND + 30f, 0xFF8A93A8.toInt())
     }
 
     override fun onFallOut() {

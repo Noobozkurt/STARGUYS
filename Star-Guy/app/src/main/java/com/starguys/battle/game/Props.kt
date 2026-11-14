@@ -72,7 +72,7 @@ class Fan(m: Match, px: Float, py: Float, var dir: Float, val length: Float = 4.
             val k = 1f - along / length
             b.vx += cx * force * k * dt / b.mass; b.vy += cy * force * k * dt / b.mass
         }
-        if (com.starguys.battle.core.chance(0.4f)) m.fx.wind(x + cx * rf(20f, length), y + cy * rf(20f, length) + rf(-30f, 30f) * abs(cx), dir)
+        if (com.starguys.battle.core.chance(0.4f)) m.fx.wind(x + cx * rf(20f, length), y + cy * rf(20f, length) + rf(-30f, 30f) * abs(cx), Fx.GND, dir)
     }
     override fun draw(c: Canvas) {
         val sy = y - z * ZS
@@ -143,7 +143,7 @@ class Cannon(m: Match, px: Float, py: Float, var tx: Float, var ty: Float) : Pro
         f.cannonT = flight + 0.5f
         f.onGround = false
         cd = 1.5f
-        m.fx.smoke(x, y - 40f, 8, 0xFFFFFFFF.toInt()); m.sound(Sfx.EXPLODE, x, y, 0.6f); m.cam.shake(3f)
+        m.fx.smoke(x, y, Fx.GND + 40f, 8, 0xFFFFFFFF.toInt()); m.sound(Sfx.EXPLODE, x, y, 0.6f); m.cam.shake(3f)
     }
     override fun draw(c: Canvas) {
         val sy = y - z * ZS
@@ -182,11 +182,11 @@ class Breakable(m: Match, px: Float, py: Float, val kind: Int) : Prop(m, px, py)
         broken = true
         when (kind) {
             0 -> { alive = false; m.explode(x, y, 1.7f * T, 1500f, src ?: m.envBody, TEAM_NEUTRAL, 1000f, color = 0xFFFF7A3D.toInt()) }
-            1 -> { alive = false; m.addZone(Zone(m, Zone.SLIME, x, y, 1.7f * T, 10f, null, TEAM_NEUTRAL)); m.fx.splat(x, y - 20f, 0xFF7BE84A.toInt()); m.sound(Sfx.SPLASH, x, y) }
+            1 -> { alive = false; m.addZone(Zone(m, Zone.SLIME, x, y, 1.7f * T, 10f, null, TEAM_NEUTRAL)); m.fx.splat(x, y, Fx.GND + 20f, 0xFF7BE84A.toInt()); m.sound(Sfx.SPLASH, x, y) }
             2 -> { m.addZone(Zone(m, Zone.JET, x, y, 3.5f * T, 9f, null, TEAM_NEUTRAL).also { it.dir = rf() * 6.28f }); m.sound(Sfx.SPLASH, x, y) }
             3 -> {
                 alive = false
-                m.fx.debris(x, y - 20f, 0xFFD9A066.toInt())
+                m.fx.debris(x, y, Fx.GND + 20f, 0xFFD9A066.toInt())
                 m.dropLoot(x, y, 2)
                 m.sound(Sfx.THUD, x, y)
             }
@@ -291,7 +291,7 @@ class Teleporter(m: Match, px: Float, py: Float, val color: Int) : Prop(m, px, p
             if (f.out || f.teleCd > 0f || f.vehicle != null || f.cannonT > 0f) continue
             if (dist(x, y, f.x, f.y) < 24f && f.z <= z + 10f) {
                 f.x = p.x; f.y = p.y + 4f; f.z = p.z; f.teleCd = 2f
-                m.fx.pixels(x, y - 20f, color); m.fx.pixels(p.x, p.y - 20f, color)
+                m.fx.pixels(x, y, Fx.GND + 20f, color); m.fx.pixels(p.x, p.y, Fx.GND + 20f, color)
                 m.sound(Sfx.TELEPORT, p.x, p.y)
             }
         }
@@ -563,7 +563,7 @@ class Snowball(m: Match, px: Float, py: Float, val dvx: Float, val dvy: Float) :
                 if (b.ragdollT <= 0f) { b.ragdollT = 0.8f; b.hurt(900f, m.envBody, 0f, 0f) }
             }
         }
-        if (com.starguys.battle.core.chance(0.5f)) m.fx.smoke(x - dvx * 0.05f, y, 1, 0xFFFFFFFF.toInt())
+        if (com.starguys.battle.core.chance(0.5f)) m.fx.smoke(x - dvx * 0.05f, y, Fx.GND, 1, 0xFFFFFFFF.toInt())
     }
     override fun draw(c: Canvas) {
         G.oval(c, x, y + 4f, r, r * 0.4f, 0x33000000, false)

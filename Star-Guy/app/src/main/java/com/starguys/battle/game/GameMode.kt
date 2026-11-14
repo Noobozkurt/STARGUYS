@@ -55,6 +55,8 @@ abstract class GameMode(val m: Match) {
     open fun botGoal(f: Fighter, g: Goal): Boolean = false
     open fun drawUnder(c: Canvas) {}
     open fun drawOver(c: Canvas) {}
+    /** 3D scene additions (hills, goals, trucks...) */
+    open fun scene3d(s: com.starguys.battle.g3d.Scene) {}
     open fun drawHud(c: Canvas, h: Hud) {}
     open fun respawnPoint(f: Fighter): FloatArray = m.randomSpawn()
     open fun canPickup(f: Fighter, p: Pickup) = true

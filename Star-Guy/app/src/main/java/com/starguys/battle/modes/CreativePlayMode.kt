@@ -1,5 +1,6 @@
 package com.starguys.battle.modes
 
+import com.starguys.battle.game.Fx
 import android.graphics.Canvas
 import com.starguys.battle.core.Sfx
 import com.starguys.battle.core.ri
@@ -56,7 +57,7 @@ class CreativePlayMode(m: Match) : GameMode(m) {
                 if (f.out || f.finished) continue
                 if (m.map.t(f.tileX(), f.tileY()) == Tl.GOAL) {
                     f.finished = true; f.out = true; order++; f.place = order
-                    m.fx.confetti(f.x, f.y - 40f, 40); Sfx.play(Sfx.PICKUP)
+                    m.fx.confetti(f.x, f.y, Fx.GND + 40f, 40); Sfx.play(Sfx.PICKUP)
                     m.hud.feed("${f.name} arrive #$order", 0xFF7CFF8A.toInt())
                 }
             }

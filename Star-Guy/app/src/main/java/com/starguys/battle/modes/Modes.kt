@@ -1,5 +1,6 @@
 package com.starguys.battle.modes
 
+import com.starguys.battle.game.Fx
 import android.graphics.Canvas
 import com.starguys.battle.core.G
 import com.starguys.battle.core.Save
@@ -121,7 +122,7 @@ class GiantMode(m: Match) : DeathmatchMode(m, 8, 10) {
         killer.growth++
         killer.maxHp = killer.hero.hp * (1f + killer.growth * 0.15f)
         killer.heal(killer.maxHp * 0.3f)
-        m.fx.text(killer.x, killer.y - 120f, "PLUS GROS !", 0xFFFFE14D.toInt())
+        m.fx.text(killer.x, killer.y, Fx.GND + 120f, "PLUS GROS !", 0xFFFFE14D.toInt())
     }
     override fun onRespawn(f: Fighter) { f.growth = 0; f.maxHp = f.hero.hp; f.hp = f.maxHp }
 }

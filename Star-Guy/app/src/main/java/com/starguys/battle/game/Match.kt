@@ -389,23 +389,23 @@ class Match(val app: GameApp, val cfg: MatchConfig) {
                 if (dist(x, y, tx * T + T / 2, ty * T + T / 2) < r + T * 0.3f) map.damage(tx, ty, dmg * 0.8f)
             }
         }
-        fx.flash(x, y - 20f, r * 1.4f, color, 0.35f)
-        fx.flash(x, y - 20f, r * 0.7f, 0xFFFFFFFF.toInt(), 0.18f)
-        fx.ring(x, y - 10f, r, color, 0.4f)
-        fx.ring(x, y - 10f, r * 0.6f, 0xFFFFFFFF.toInt(), 0.3f)
-        fx.smoke(x, y - 20f, 8, 0xFFEDE6F5.toInt())
-        fx.stars(x, y - 20f, 6, color)
+        fx.flash(x, y, Fx.GND + 20f, r * 1.4f, color, 0.35f)
+        fx.flash(x, y, Fx.GND + 20f, r * 0.7f, 0xFFFFFFFF.toInt(), 0.18f)
+        fx.ring(x, y, Fx.GND + 10f, r, color, 0.4f)
+        fx.ring(x, y, Fx.GND + 10f, r * 0.6f, 0xFFFFFFFF.toInt(), 0.3f)
+        fx.smoke(x, y, Fx.GND + 20f, 8, 0xFFEDE6F5.toInt())
+        fx.stars(x, y, Fx.GND + 20f, 6, color)
         cam.shakeAt(x, y, 7f)
         sound(Sfx.EXPLODE, x, y)
     }
 
     fun healArea(x: Float, y: Float, r: Float, amount: Float, team: Int) {
         for (f in fighters) if (!f.out && f.team == team && dist(x, y, f.x, f.y) < r) f.heal(amount)
-        fx.ring(x, y, r, 0xFF7CFF8A.toInt())
+        fx.ring(x, y, Fx.GND, r, 0xFF7CFF8A.toInt())
     }
 
     fun melee(src: Body, x: Float, y: Float, a: Float, range: Float, halfArc: Float, dmg: Float, knock: Float, reflect: Boolean, stun: Float, color: Int) {
-        fx.swoosh(x, y - src.z * ZS - 24f, range * 0.85f, a, halfArc, color)
+        fx.swoosh(x, y, src.z + 24f, range * 0.85f, a, halfArc, color)
         for (b in ArrayList(hittables)) {
             if (b === src || !b.hittable || !isEnemy(src.team, b)) continue
             val d = dist(x, y, b.x, b.y)
@@ -415,7 +415,7 @@ class Match(val app: GameApp, val cfg: MatchConfig) {
             if (d > b.radius + 10f && abs(angleDiff(a, ba)) > halfArc + 0.15f) continue
             if (b.hurt(dmg, src, cosf(ba) * knock, sinf(ba) * knock)) {
                 if (stun > 0f) b.applyStatus(St.STUN, stun, src)
-                fx.hit(b.x, b.y - b.z * ZS - 30f, color)
+                fx.hit(b.x, b.y, b.z + 30f, color)
             }
         }
         if (reflect) for (p in projs) {
@@ -424,7 +424,7 @@ class Match(val app: GameApp, val cfg: MatchConfig) {
             if (d > range + 20f) continue
             if (abs(angleDiff(a, ang(x, y, p.x, p.y))) > halfArc + 0.3f) continue
             p.reflect(src, src.team)
-            fx.stars(p.x, p.y - p.z * ZS, 3, 0xFFFFFFFF.toInt())
+            fx.stars(p.x, p.y, p.z, 3, 0xFFFFFFFF.toInt())
         }
         // smash crates in front
         val hx = x + cosf(a) * range * 0.7f; val hy = y + sinf(a) * range * 0.7f
@@ -464,15 +464,15 @@ class Match(val app: GameApp, val cfg: MatchConfig) {
                 if (abs(b.x - ex) > b.radius + width || abs(b.y - ey) > b.radius + width) continue
                 if (dist(ex, ey, b.x, b.y) < b.radius + width * 0.5f) {
                     hit.add(b)
-                    if (b.hurt(dmg, src, cosf(a) * 200f, sinf(a) * 200f)) fx.hit(b.x, b.y - b.z * ZS - 30f, color)
+                    if (b.hurt(dmg, src, cosf(a) * 200f, sinf(a) * 200f)) fx.hit(b.x, b.y, b.z + 30f, color)
                     if (!pierceBodies) { stop = true; break }
                 }
             }
             if (stop) break
         }
         val zz = z * ZS
-        fx.line(sx, sy - zz, ex, ey - zz, color, 0.22f, width)
-        fx.line(sx, sy - zz, ex, ey - zz, 0xFFFFFFFF.toInt(), 0.12f, width * 0.35f)
+        fx.line(sx, sy, z, ex, ey, z, color, 0.22f, width)
+        fx.line(sx, sy, z, ex, ey, z, 0xFFFFFFFF.toInt(), 0.12f, width * 0.35f)
     }
 
     private fun isThin(tx: Int, ty: Int, a: Float): Boolean {
@@ -493,7 +493,7 @@ class Match(val app: GameApp, val cfg: MatchConfig) {
         val tp = map.t(tx, ty)
         val destroyed = map.damage(tx, ty, p.dmg * p.tileDmg)
         if (tp == Tl.GLASS) sound(Sfx.GLASS, p.x, p.y, if (destroyed) 1f else 0.4f)
-        fx.hit(p.x, p.y - p.z * ZS, p.color)
+        fx.hit(p.x, p.y, p.z, p.color)
         if (p.explodeR > 0f) explode(p.x, p.y, p.explodeR, p.dmg, p.owner, p.team, p.knock + 200f)
         if (p.grapple) {
             val o = p.owner as? Fighter
@@ -527,10 +527,10 @@ class Match(val app: GameApp, val cfg: MatchConfig) {
     private fun onTileDestroyed(tx: Int, ty: Int, tp: Int) {
         val x = tx * T + T / 2; val y = ty * T + T / 2
         when (tp) {
-            Tl.GLASS -> { fx.debris(x, y - 30f, 0xFFCDEBFF.toInt()); sound(Sfx.GLASS, x, y) }
-            Tl.BOX, Tl.LOW -> { fx.debris(x, y - 30f, 0xFFD9A066.toInt()); sound(Sfx.THUD, x, y, 0.6f); if (mode.dropOnDeath && rf() < 0.35f) dropLoot(x, y, 1) }
-            Tl.BRICK -> fx.debris(x, y - 30f, 0xFFE07B4A.toInt())
-            Tl.FOAM -> fx.smoke(x, y, 3, 0xFFFFFFFF.toInt())
+            Tl.GLASS -> { fx.debris(x, y, Fx.GND + 30f, 0xFFCDEBFF.toInt()); sound(Sfx.GLASS, x, y) }
+            Tl.BOX, Tl.LOW -> { fx.debris(x, y, Fx.GND + 30f, 0xFFD9A066.toInt()); sound(Sfx.THUD, x, y, 0.6f); if (mode.dropOnDeath && rf() < 0.35f) dropLoot(x, y, 1) }
+            Tl.BRICK -> fx.debris(x, y, Fx.GND + 30f, 0xFFE07B4A.toInt())
+            Tl.FOAM -> fx.smoke(x, y, Fx.GND, 3, 0xFFFFFFFF.toInt())
         }
     }
 
@@ -591,7 +591,7 @@ class Match(val app: GameApp, val cfg: MatchConfig) {
 
     fun giveGadget(f: Fighter, id: Int) {
         val g = Gadgets.list[id]
-        if (id == Gadgets.PARACHUTE) { f.parachutes++; fx.text(f.x, f.y - 90f, "+1 PARACHUTE", 0xFFFF6B6B.toInt()); return }
+        if (id == Gadgets.PARACHUTE) { f.parachutes++; fx.text(f.x, f.y, Fx.GND + 90f, "+1 PARACHUTE", 0xFFFF6B6B.toInt()); return }
         f.gadget = g; f.gadgetCharges = g.charges
     }
 
@@ -614,7 +614,7 @@ class Match(val app: GameApp, val cfg: MatchConfig) {
                     Pickup.STAR -> { f.chargeSuper(0.5f); took = true }
                     Pickup.GOLD -> {}
                 }
-                if (took) { p.alive = false; sound(Sfx.PICKUP, p.x, p.y, 0.7f); fx.stars(p.x, p.y - 20f, 4, 0xFFFFE14D.toInt()); break }
+                if (took) { p.alive = false; sound(Sfx.PICKUP, p.x, p.y, 0.7f); fx.stars(p.x, p.y, Fx.GND + 20f, 4, 0xFFFFE14D.toInt()); break }
             }
         }
     }
@@ -622,7 +622,7 @@ class Match(val app: GameApp, val cfg: MatchConfig) {
     fun addPing(x: Float, y: Float, team: Int) {
         pings.add(Ping(x, y, team))
         for (f in fighters) if (!f.human && f.team == team) f.brain?.ping(x, y)
-        if (player?.team == team) { Sfx.play(Sfx.COUNT, 0.6f, 1.5f); fx.ring(x, y, 60f, 0xFFFBBF24.toInt(), 0.6f) }
+        if (player?.team == team) { Sfx.play(Sfx.COUNT, 0.6f, 1.5f); fx.ring(x, y, Fx.GND, 60f, 0xFFFBBF24.toInt(), 0.6f) }
     }
 
     fun onFighterDeath(f: Fighter, killer: Fighter?) {
@@ -660,7 +660,7 @@ class Match(val app: GameApp, val cfg: MatchConfig) {
         if (!cfg.net) { slowMo = 0.5f; slowT = 1.5f }
         Sfx.play(if (playerWon) Sfx.WIN else Sfx.LOSE)
         player?.emote = if (playerWon) 10f else 0f
-        if (playerWon) player?.let { fx.confetti(it.x, it.y - 60f, 60) }
+        if (playerWon) player?.let { fx.confetti(it.x, it.y, Fx.GND + 60f, 60) }
     }
 
     // ------------------------------------------------------------------ update
@@ -676,6 +676,7 @@ class Match(val app: GameApp, val cfg: MatchConfig) {
 
     /** Presentation only (camera, HUD, end-of-match timer). Never touches the simulation. */
     fun frame(rawDt: Float) {
+        frameDt = rawDt
         updateCamera(rawDt)
         hud.update(rawDt)
         if (over) {
@@ -780,7 +781,7 @@ class Match(val app: GameApp, val cfg: MatchConfig) {
                 if (p.z > pr.z + 70f) continue
                 if (dist(p.x, p.y, pr.x, pr.y) < pr.solidR + p.r * 0.5f) {
                     if (p.boomerang && !p.returning) { p.returning = true; continue }
-                    p.alive = false; fx.hit(p.x, p.y - p.z * ZS, p.color)
+                    p.alive = false; fx.hit(p.x, p.y, p.z, p.color)
                     mode.onPropShot(pr, p)
                     if (p.explodeR > 0f) explode(p.x, p.y, p.explodeR, p.dmg, p.owner, p.team, p.knock + 200f)
                 }
@@ -813,7 +814,19 @@ class Match(val app: GameApp, val cfg: MatchConfig) {
     }
 
     // ------------------------------------------------------------------ render
+    /** the 3D scene (TPS camera + GL frame builder) */
+    val scene by lazy { com.starguys.battle.g3d.Scene(this) }
+    private var frameDt = 1f / 60f
+
     fun draw(c: Canvas) {
+        if (!com.starguys.battle.g3d.Gfx3D.ok) { draw2D(c); return }
+        scene.build(app.w, app.h, frameDt)
+        c.drawColor(0, android.graphics.PorterDuff.Mode.CLEAR)
+        hud.draw(c)
+    }
+
+    /** classic top-down renderer (fallback when OpenGL ES 3 is unavailable) */
+    fun draw2D(c: Canvas) {
         val w = app.w; val h = app.h
         // background
         if (bgH != h) { bgPaint.shader = LinearGradient(0f, 0f, 0f, h, biome.bgTop, biome.bgBottom, Shader.TileMode.CLAMP); bgH = h }

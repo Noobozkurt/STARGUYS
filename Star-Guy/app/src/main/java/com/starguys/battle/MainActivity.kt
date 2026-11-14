@@ -12,6 +12,7 @@ import com.starguys.battle.ui.MainMenu
 
 class MainActivity : Activity() {
     private lateinit var view: GameView
+    private var glView: com.starguys.battle.g3d.GlView? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -23,7 +24,11 @@ class MainActivity : Activity() {
         Sfx.init(this)
         view = GameView(this) { app -> MainMenu(app) }
         view.app.onFrame = { app -> com.starguys.battle.ui.NetUi.pump(app) }
-        setContentView(view)
+        glView = try { com.starguys.battle.g3d.GlView(this) } catch (e: Throwable) { com.starguys.battle.g3d.Gfx3D.ok = false; null }
+        val root = android.widget.FrameLayout(this)
+        glView?.let { root.addView(it) }
+        root.addView(view)
+        setContentView(root)
         immersive()
     }
 
@@ -44,12 +49,14 @@ class MainActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
+        glView?.onResume()
         view.onResumeView()
         Sfx.resumeAll()
     }
 
     override fun onPause() {
         view.onPauseView()
+        glView?.onPause()
         Sfx.pauseAll()
         super.onPause()
     }

@@ -1,5 +1,6 @@
 package com.starguys.battle.modes
 
+import com.starguys.battle.game.Fx
 import android.graphics.Canvas
 import com.starguys.battle.core.G
 import com.starguys.battle.core.Sfx
@@ -121,7 +122,7 @@ class CastleMode(m: Match) : GameMode(m) {
         if (dist(MapGen.tc(tx), MapGen.tc(ty), core.x, core.y) < 1.6f * T) return false
         m.map.set(tx, ty, Tl.BRICK)
         bricks[f] = n - 1
-        m.fx.smoke(MapGen.tc(tx), MapGen.tc(ty), 3, 0xFFE07B4A.toInt()); m.sound(Sfx.THUD, x, y, 0.6f)
+        m.fx.smoke(MapGen.tc(tx), MapGen.tc(ty), Fx.GND, 3, 0xFFE07B4A.toInt()); m.sound(Sfx.THUD, x, y, 0.6f)
         return true
     }
 
@@ -191,7 +192,7 @@ class EscapeMode(m: Match) : GameMode(m) {
             if (f.x < waveX) { f.hurt(99999f, m.envBody, 0f, 0f) }
             if (m.map.t(f.tileX(), f.tileY()) == Tl.GOAL) {
                 f.finished = true; f.out = true; order++; f.place = order; f.score = countdown
-                m.fx.confetti(f.x, f.y - 40f, 40); Sfx.play(Sfx.PICKUP)
+                m.fx.confetti(f.x, f.y, Fx.GND + 40f, 40); Sfx.play(Sfx.PICKUP)
                 m.hud.feed("${f.name} s'est échappé ! (#$order)", 0xFF7CFF8A.toInt())
                 if (f.isLocal) m.hud.big("ÉCHAPPÉ !", 0xFF7CFF8A.toInt(), 2f)
             }
@@ -213,6 +214,17 @@ class EscapeMode(m: Match) : GameMode(m) {
     override fun scoreText(f: Fighter) = if (f.finished) "Échappé #${f.place}" else "Pris dans l'explosion"
 
     override fun botGoal(f: Fighter, g: Goal): Boolean = g.set(m.map.pxW - 2f * T, f.y.coerceIn(2f * T, m.map.pxH - 2f * T), 1f)
+
+    override fun scene3d(s: com.starguys.battle.g3d.Scene) {
+        val x = waveX
+        if (x < -100f) return
+        val b = s.mb; b.reset(); b.at(x - 300f, m.map.pxH / 2, -100f, 0f)
+        b.part(com.starguys.battle.g3d.Meshes.BOX, 0f, 200f, 0f, 600f, 500f, m.map.pxH + 400f, 0xFFFF5E3D.toInt(), cat = com.starguys.battle.g3d.Cat.GLOW, a = 0.55f)
+        for (k in 0 until 16) {
+            val yy = (k / 15f) * m.map.pxH
+            s.bill(true, x + sinf(m.time * 5f + k * 2f) * 16f, yy, 40f + sinf(m.time * 7f + k) * 30f, com.starguys.battle.g3d.Spr.GLOW, 70f + sinf(m.time * 9f + k) * 20f, if (k % 2 == 0) 0xFFFFD23F.toInt() else 0xFFFF7A3D.toInt(), 0.9f)
+        }
+    }
 
     override fun drawOver(c: Canvas) {
         // explosion wall

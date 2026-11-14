@@ -1,5 +1,6 @@
 package com.starguys.battle.modes
 
+import com.starguys.battle.game.Fx
 import android.graphics.Canvas
 import com.starguys.battle.core.G
 import com.starguys.battle.core.pickOrNull
@@ -160,6 +161,18 @@ class KothMode(m: Match) : GameMode(m) {
 
     override fun botGoal(f: Fighter, g: Goal): Boolean = g.set(hx + rf(-T, T), hy + rf(-T, T), 0.85f)
 
+    override fun scene3d(s: com.starguys.battle.g3d.Scene) {
+        val col = holder?.let { if (it === m.player) 0xFF4ADE80.toInt() else 0xFFF43F5E.toInt() } ?: 0xFFFFE14D.toInt()
+        s.groundDisc(hx, hy, hr, col, 0.25f); s.groundRing(hx, hy, hr, col, 0.9f)
+        val b = s.mb; val z = s.ground(hx, hy)
+        b.at(hx, hy, z, 0f)
+        b.box(0f, 12f, 0f, 140f, 16f, 60f, 0xFF8B5A3C.toInt()); b.box(0f, 21f, 0f, 120f, 3f, 44f, 0xFFC28A4E.toInt())
+        for (k in intArrayOf(-1, 1)) for (q in intArrayOf(-1, 1)) b.part(com.starguys.battle.g3d.Meshes.CYL, k * 52f, 8f, q * 32f, 18f, 6f, 18f, 0xFF3A3A44.toInt(), rx = 1.5708f)
+        b.cyl(0f, 20f, 0f, 5f, 150f, 0xFF1B1530.toInt())
+        b.part(com.starguys.battle.g3d.Meshes.BOX, 0f, 132f, 26f, 2f, 30f, 50f, col)
+        s.bill(true, hx, hy, z + 175f, com.starguys.battle.g3d.Spr.STAR, 18f, 0xFFFFE14D.toInt(), 1f, m.time * 2f)
+    }
+
     override fun drawUnder(c: Canvas) {
         val col = holder?.let { if (it === m.player) 0xFF7CFF8A.toInt() else 0xFFFF5E7E.toInt() } ?: 0xFFFFE14D.toInt()
         G.circle(c, hx, hy, hr, G.alpha(col, 0.22f), false)
@@ -219,7 +232,7 @@ class HeistMode(m: Match) : GameMode(m) {
             return false
         } else {
             // defenders return dropped gold to the vault
-            if (dist(p.x, p.y, vaultX, vaultY) > 4f * T) { p.x = vaultX + rf(-60f, 60f); p.y = vaultY + rf(-40f, 40f); m.fx.stars(p.x, p.y, 5, 0xFFFFD23F.toInt()) }
+            if (dist(p.x, p.y, vaultX, vaultY) > 4f * T) { p.x = vaultX + rf(-60f, 60f); p.y = vaultY + rf(-40f, 40f); m.fx.stars(p.x, p.y, Fx.GND, 5, 0xFFFFD23F.toInt()) }
             return false
         }
     }
@@ -229,7 +242,7 @@ class HeistMode(m: Match) : GameMode(m) {
             if (f.out || f.team != 0 || f.carry == 0) continue
             if (f.x < MapGen.tc(8) && f.y > MapGen.tc(8) && f.y < MapGen.tc(19)) {
                 delivered += f.carry; f.carry = 0
-                m.fx.confetti(f.x, f.y - 40f, 20); Sfx.play(Sfx.COIN)
+                m.fx.confetti(f.x, f.y, Fx.GND + 40f, 20); Sfx.play(Sfx.COIN)
                 m.hud.feed("${f.name} livre un lingot ! ($delivered/$goal)", 0xFFFFD23F.toInt())
             }
         }
@@ -255,6 +268,15 @@ class HeistMode(m: Match) : GameMode(m) {
     override fun ranking(): List<Fighter> = m.fighters.sortedWith(compareBy<Fighter>({ if (it.team == winTeam()) 0 else 1 }, { -it.kills }))
     private fun winTeam() = if (delivered >= goal) 0 else 1
     override fun playerWon() = m.won
+
+    override fun scene3d(s: com.starguys.battle.g3d.Scene) {
+        s.groundRect((MapGen.tc(2) + MapGen.tc(7)) / 2, (MapGen.tc(9) + MapGen.tc(18)) / 2, (MapGen.tc(7) - MapGen.tc(2)) / 2 + T / 2, (MapGen.tc(18) - MapGen.tc(9)) / 2 + T / 2, 0xFF35A0F4.toInt(), 0.25f)
+        val b = s.mb; b.at(truckX, truckY, s.ground(truckX, truckY), 0f)
+        b.box(-10f, 40f, 0f, 120f, 64f, 70f, 0xFF35A0F4.toInt()); b.box(56f, 30f, 0f, 30f, 44f, 64f, 0xFF2563EB.toInt())
+        b.box(71.5f, 38f, 0f, 1f, 20f, 50f, 0xFFBFE8FF.toInt(), cat = com.starguys.battle.g3d.Cat.FLAT)
+        for (k in intArrayOf(-40, 40)) for (q in intArrayOf(-1, 1)) b.part(com.starguys.battle.g3d.Meshes.CYL, k.toFloat(), 14f, q * 36f, 28f, 8f, 28f, 0xFF3A3A44.toInt(), rx = 1.5708f)
+        s.bill(true, vaultX, MapGen.tc(8), s.ground(vaultX, MapGen.tc(8)) + 120f, com.starguys.battle.g3d.Spr.GLOW, 60f, 0xFFFFD23F.toInt(), 0.5f)
+    }
 
     override fun drawUnder(c: Canvas) {
         G.ow = 3f
@@ -316,7 +338,7 @@ class CtfMode(m: Match) : GameMode(m) {
             if (carried != null && ownFlag.atHome && dist(f.x, f.y, ownFlag.homeX, ownFlag.homeY) < 70f) {
                 caps[f.team]++
                 carried.reset(); f.flag = null
-                m.fx.confetti(f.x, f.y - 50f, 40); Sfx.play(Sfx.WIN, 0.6f)
+                m.fx.confetti(f.x, f.y, Fx.GND + 50f, 40); Sfx.play(Sfx.WIN, 0.6f)
                 m.hud.big("CAPTURE ${teamName(f.team).uppercase()} !", teamColor(f.team), 2f)
             }
         }
@@ -363,7 +385,7 @@ class InfectionMode(m: Match) : GameMode(m) {
         f.infected = true; f.team = 1
         f.setHero(Heroes.slime); f.weapon = null; f.items.clear(); f.gadget = null
         f.spawnShield = 1f
-        m.fx.splat(f.x, f.y - 30f, 0xFF7BE84A.toInt()); Sfx.play(Sfx.SPLASH, 0.6f)
+        m.fx.splat(f.x, f.y, Fx.GND + 30f, 0xFF7BE84A.toInt()); Sfx.play(Sfx.SPLASH, 0.6f)
         m.hud.feed("${f.name} est infecté !", 0xFF7BE84A.toInt())
         if (f.isLocal) m.hud.big("TU ES INFECTÉ ! CONTAMINE-LES !", 0xFF7BE84A.toInt(), 2.5f)
     }
@@ -447,7 +469,7 @@ class FootballMode(m: Match) : GameMode(m) {
             if (scorer >= 0) {
                 goals[scorer]++
                 m.explode(ball.x, ball.y, 2.5f * T, 0f, m.envBody, com.starguys.battle.game.TEAM_NEUTRAL, 0f)
-                m.fx.confetti(ball.x, ball.y - 60f, 60)
+                m.fx.confetti(ball.x, ball.y, Fx.GND + 60f, 60)
                 Sfx.play(Sfx.WHISTLE)
                 m.hud.big("BUT DES ${teamName(scorer).uppercase()} !", teamColor(scorer), 2f)
                 resetT = 2f
@@ -476,6 +498,21 @@ class FootballMode(m: Match) : GameMode(m) {
 
     override fun ranking(): List<Fighter> = m.fighters.sortedWith(compareBy<Fighter>({ if (goals[it.team] >= goals[1 - it.team]) 0 else 1 }, { -it.kills }))
     override fun playerWon() = m.won
+
+    override fun scene3d(s: com.starguys.battle.g3d.Scene) {
+        val gy0 = MapGen.tc(m.map.h / 2 - 3) - T / 2; val gy1 = MapGen.tc(m.map.h / 2 + 2) + T / 2
+        val b = s.mb
+        for (side in 0..1) {
+            val gx = if (side == 0) T * 0.55f else m.map.pxW - T * 0.55f
+            s.groundRect(gx, (gy0 + gy1) / 2, T * 0.55f, (gy1 - gy0) / 2, teamColor(side), 0.4f)
+            b.at(gx, gy0, s.ground(gx, gy0), 0f); b.cyl(0f, 0f, 0f, 8f, 130f, 0xFFFFFFFF.toInt())
+            b.at(gx, gy1, s.ground(gx, gy1), 0f); b.cyl(0f, 0f, 0f, 8f, 130f, 0xFFFFFFFF.toInt())
+            b.at(gx, (gy0 + gy1) / 2, s.ground(gx, gy0) + 130f, 0f); b.box(0f, 0f, 0f, 8f, 8f, gy1 - gy0, 0xFFFFFFFF.toInt())
+            b.glass(com.starguys.battle.g3d.Meshes.BOX, 0f, -65f, 0f, 2f, 130f, gy1 - gy0, teamColor(side), 0.2f)
+        }
+        s.groundRing(m.map.pxW / 2, m.map.pxH / 2, 3f * T, 0xFFFFFFFF.toInt(), 0.5f)
+        s.groundRect(m.map.pxW / 2, m.map.pxH / 2, 3f, m.map.pxH / 2 - T, 0xFFFFFFFF.toInt(), 0.5f)
+    }
 
     override fun drawUnder(c: Canvas) {
         val gy0 = MapGen.tc(m.map.h / 2 - 3) - T / 2; val gy1 = MapGen.tc(m.map.h / 2 + 2) + T / 2
@@ -537,14 +574,14 @@ class PropHuntMode(m: Match) : GameMode(m) {
         if (f.team != 0) return false
         val i = Decor.DISGUISES.indexOf(f.disguise)
         f.disguise = Decor.DISGUISES[(i + 1) % Decor.DISGUISES.size]
-        m.fx.smoke(f.x, f.y - 20f, 4, 0xFFFFFFFF.toInt()); Sfx.play(Sfx.BUBBLE, 0.5f)
+        m.fx.smoke(f.x, f.y, Fx.GND + 20f, 4, 0xFFFFFFFF.toInt()); Sfx.play(Sfx.BUBBLE, 0.5f)
         return true
     }
 
     /** Called when a hunter's shot is stopped by a real decor prop. */
     override fun onPropShot(p: Prop, proj: Projectile) {
         val o = proj.ownerF ?: return
-        if (o.team == 1 && p is Decor && p.kind in Decor.DISGUISES) { o.hurt(140f, m.envBody, 0f, 0f); m.fx.text(o.x, o.y - 80f, "-140 (raté)", 0xFFFF9AB0.toInt()) }
+        if (o.team == 1 && p is Decor && p.kind in Decor.DISGUISES) { o.hurt(140f, m.envBody, 0f, 0f); m.fx.text(o.x, o.y, Fx.GND + 80f, "-140 (raté)", 0xFFFF9AB0.toInt()) }
     }
 
     override fun botGoal(f: Fighter, g: Goal): Boolean {

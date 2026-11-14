@@ -212,7 +212,7 @@ open class Mob(m: Match, val kind: Int, var size: Int = 2) : Actor(m) {
         hp -= d; hitFlash = 0.1f
         if (atk != null) { atk.onDealt(d, this); lastAttacker = atk; lastAttackerT = 0f }
         numAcc += d
-        if (numAcc >= 120f || d >= 60f || m.time - numT > 0.6f) { m.fx.number(x, y - z * ZS - bodyH - 6f, numAcc, 0xFFFFFFFF.toInt()); numAcc = 0f; numT = m.time }
+        if (numAcc >= 120f || d >= 60f || m.time - numT > 0.6f) { m.fx.number(x, y, z + bodyH + 6f, numAcc, 0xFFFFFFFF.toInt()); numAcc = 0f; numT = m.time }
         if (!isBoss) knock(kx * 0.6f, ky * 0.6f)
         if (hp <= 0f) die(atk)
         return true
@@ -221,7 +221,7 @@ open class Mob(m: Match, val kind: Int, var size: Int = 2) : Actor(m) {
     open fun die(killer: Fighter?) {
         if (!alive) return
         alive = false
-        m.fx.confetti(x, y - z * ZS - 20f, if (isBoss) 80 else 12)
+        m.fx.confetti(x, y, z + 20f, if (isBoss) 80 else 12)
         m.sound(Sfx.POP, x, y, 0.7f)
         when (kind) {
             GLUANT -> if (size > 0) for (k in 0 until 2) {
@@ -332,7 +332,7 @@ class Boss(m: Match, kind: Int) : Mob(m, kind) {
     override fun think(dt: Float) {
         val tg = target
         stateT -= dt
-        if (!phase2 && hp < maxHp * 0.5f) { phase2 = true; m.fx.text(x, y - 200f, "PHASE 2 !", 0xFFFF3D3D.toInt()); m.sound(Sfx.ALARM, x, y); m.cam.shake(8f) }
+        if (!phase2 && hp < maxHp * 0.5f) { phase2 = true; m.fx.text(x, y, Fx.GND + 200f, "PHASE 2 !", 0xFFFF3D3D.toInt()); m.sound(Sfx.ALARM, x, y); m.cam.shake(8f) }
         val sp = if (phase2) 1.35f else 1f
         when (kind) {
             BOSS_JELLY -> jelly(tg, dt, sp)
@@ -406,7 +406,7 @@ class Boss(m: Match, kind: Int) : Mob(m, kind) {
                 clawZ = 40f
                 var best: Fighter? = null
                 for (f in m.fighters) if (!f.out && dist(clawX, clawY, f.x, f.y) < 50f) best = f
-                if (best != null) { grabbed = best; best.hurt(600f, this, 0f, 0f); m.fx.text(best.x, best.y - 90f, "ATTRAPÉ !", 0xFFFF5E7E.toInt()) }
+                if (best != null) { grabbed = best; best.hurt(600f, this, 0f, 0f); m.fx.text(best.x, best.y, Fx.GND + 90f, "ATTRAPÉ !", 0xFFFF5E7E.toInt()) }
                 m.sound(Sfx.THUD, clawX, clawY); next(3, 1.5f) } }
             3 -> { clawZ += (260f - clawZ) * dt * 3f
                 if (stateT <= 0f) { val gg = grabbed; if (gg != null) { gg.vx = rf(-500f, 500f); gg.vy = rf(-500f, 500f); gg.vz = 200f; gg.ragdollT = 0.8f; gg.hurt(700f, this, 0f, 0f) }; grabbed = null; next(0, 1.2f / sp) } }
