@@ -11,10 +11,12 @@ import com.starguys.battle.core.len
 import com.starguys.battle.core.rf
 import com.starguys.battle.core.sinf
 import kotlin.math.abs
-import kotlin.math.atan2
+import com.starguys.battle.core.atan2
 
 /** A hero (the player or a bot). */
-class Fighter(m: Match, hero: HeroDef, val name: String, team: Int, val human: Boolean, var skin: Int = 0) : Actor(m) {
+class Fighter(m: Match, hero: HeroDef, var name: String, team: Int, var human: Boolean, var skin: Int = 0) : Actor(m) {
+    /** id of the human controlling this fighter (multiplayer), -1 for bots */
+    var netId = -1
     var hero: HeroDef = hero
         private set
     var color = hero.colors[skin.coerceIn(0, hero.colors.size - 1)]
@@ -285,7 +287,7 @@ class Fighter(m: Match, hero: HeroDef, val name: String, team: Int, val human: B
         if (disguise >= 0) disguise = -1
         w.fire(this, a, d)
         if (m.zeroG && w.recoil > 0f) knock(-cosf(a) * w.recoil * 0.9f, -sinf(a) * w.recoil * 0.9f)
-        if (weapon != null && wAmmo <= 0) { weapon = null; if (human) m.hud.toastSmall("Plus de munitions !") }
+        if (weapon != null && wAmmo <= 0) { weapon = null; if (isLocal) m.hud.toastSmall("Plus de munitions !") }
     }
 
     fun useSuper(a: Float, d: Float) {
@@ -294,7 +296,7 @@ class Fighter(m: Match, hero: HeroDef, val name: String, team: Int, val human: B
         face = a; aimT = 0f
         Supers.activate(this, a, d)
         m.sound(Sfx.SUPER, x, y)
-        if (human) Sfx.buzz(30)
+        if (isLocal) Sfx.buzz(30)
     }
 
     fun chargeSuper(amount: Float) { superCharge = minOf(1f, superCharge + amount) }
@@ -302,7 +304,7 @@ class Fighter(m: Match, hero: HeroDef, val name: String, team: Int, val human: B
     fun onDealt(d: Float, victim: Body) {
         dmgDone += d
         if (victim is Fighter || victim is Mob) chargeSuper(d / hero.superCost * m.mode.superMul)
-        if (human) m.hud.hitMarker()
+        if (isLocal) m.hud.hitMarker()
     }
 
     fun jump() {
@@ -374,7 +376,7 @@ class Fighter(m: Match, hero: HeroDef, val name: String, team: Int, val human: B
         hitFlash = 0.12f
         numAcc += dmg
         if (Save_dmgNumbers() && (numAcc >= 120f || dmg >= 60f || m.time - numT > 0.6f)) {
-            m.fx.number(x, y - z * ZS - bodyH - 8f, numAcc, if (human) 0xFFFF5E7E.toInt() else 0xFFFFFFFF.toInt())
+            m.fx.number(x, y - z * ZS - bodyH - 8f, numAcc, if (isLocal) 0xFFFF5E7E.toInt() else 0xFFFFFFFF.toInt())
             numAcc = 0f; numT = m.time
         }
         var kmul = 1f
@@ -390,13 +392,14 @@ class Fighter(m: Match, hero: HeroDef, val name: String, team: Int, val human: B
         }
         if (kkx != 0f || kky != 0f) knock(kkx * kmul, kky * kmul)
         if (m.mode.percentMode && len(kkx, kky) * kmul > 700f) ragdollT = maxOf(ragdollT, 0.35f)
-        if (human) { m.cam.shake(4f); Sfx.buzz(20) }
+        if (isLocal) { m.cam.shake(4f); Sfx.buzz(20) }
         m.sound(Sfx.HIT, x, y, 0.6f)
         if (hp <= 0f) die(atk ?: (if (lastAttackerT < 6f) lastAttacker else null))
         return true
     }
 
-    private fun Save_dmgNumbers() = com.starguys.battle.core.Save.damageNumbers || human
+    private fun Save_dmgNumbers() = com.starguys.battle.core.Save.damageNumbers || isLocal
+    val isLocal: Boolean get() = m.player === this
 
     fun heal(a: Float, show: Boolean = true) {
         if (out || hp >= maxHp) return
@@ -417,7 +420,7 @@ class Fighter(m: Match, hero: HeroDef, val name: String, team: Int, val human: B
     override fun applyStatus(s: Int, t: Float, src: Body?) {
         if (out) return
         if (superT > 0 && (superKind == 0 || superKind == 2) && (s == St.STUN || s == St.SLIP)) return
-        if (s == St.BLIND && human) m.hud.blind(t)
+        if (s == St.BLIND && isLocal) m.hud.blind(t)
         super.applyStatus(s, t, src)
     }
 
@@ -493,6 +496,11 @@ class Fighter(m: Match, hero: HeroDef, val name: String, team: Int, val human: B
         c.scale(s * shrink * (if (flip) -1f else 1f) / sq, s * shrink * sq)
         if (ragdollT > 0) c.rotate((spin * 57f) % 360f, 0f, -26f)
         else if (!onGround && hasDived) c.rotate(if (flip) -60f else 60f, 0f, -20f)
+        else if (onGround) {
+            // lean into the run (3D feel)
+            val lean = clamp(vx / maxOf(hero.speed, 1f), -1f, 1f) * 9f
+            c.rotate(if (flip) -lean else lean, 0f, -6f)
+        }
         G.flash = if (hitFlash > 0) 0.65f else 0f
         G.fade = if (inv) 0.35f else if (spawnShield > 0 && ((m.time * 10).toInt() % 2 == 0)) 0.55f else 1f
         G.ow = 3f
@@ -501,7 +509,10 @@ class Fighter(m: Match, hero: HeroDef, val name: String, team: Int, val human: B
             Decor.drawDisguise(c, disguise)
         } else {
             val sup = superT > 0 && (superKind == hero.id) && (hero.id == 0 || hero.id == 2 || hero.id == 10)
+            // facing away from the camera: show the hero's back
+            G.noFace = ly < -0.55f && (moving || aimT < 0.5f)
             HeroArt.draw(c, hero.id, color, animT, moving, lx, ly, sup, stunT > 0)
+            G.noFace = false
             if (emote > 0) drawEmote(c)
         }
         G.flash = 0f; G.fade = 1f

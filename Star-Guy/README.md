@@ -27,6 +27,14 @@ The APK is created at `app/build/outputs/apk/debug/app-debug.apk`. You can copy 
 ```
 `SimTest` plays every mode for 30 to 150 simulated seconds. The player's slot is also driven by a bot, and the test runs the full draw path to catch crashes.
 
+## Local multiplayer (Wi-Fi and Bluetooth)
+Main menu ▸ **MULTIJOUEUR**:
+- **Wi-Fi local** supports up to 8 players. All phones must be on the same Wi-Fi network, or connected to one phone's hotspot. One player taps **Créer une partie**. The others tap **Rejoindre**, and the game appears in the list. If it doesn't, use **IP manuelle** with the address shown on the host's screen.
+- **Bluetooth** supports up to 4 players and needs no Wi-Fi. The host taps **Créer une partie** and accepts the "visible" prompt. The others tap **Rejoindre** and pick the host's phone. Android asks for the Bluetooth permissions the first time.
+- In the room (*salon*), the host chooses the mode, the biome, the bot difficulty, and whether humans play as **teammates or opponents**. Each player picks their own hero. Bots fill the empty slots.
+
+The networking uses **deterministic lockstep**: every phone runs the same simulation and only the players' touch inputs are exchanged. It uses very little bandwidth, so it works well over Bluetooth. If a player disconnects, a bot takes over their hero. `NetTest` runs a real host and client over a socket and checks that both simulations stay bit-identical. It also checks that all 19 modes are deterministic from every player's point of view.
+
 ## Controls (touch)
 | Control | Action |
 |---|---|
@@ -37,7 +45,7 @@ The APK is created at `app/build/outputs/apk/debug/app-debug.apk`. You can copy 
 | Blue button | Gadget, when you have one |
 | Pink button | Consumable, when you have one |
 | Orange button | Contextual action: get in or out of a vehicle, swap a weapon, use a zipline, cannon or claw machine, build a barricade, change disguise… |
-| `!` | Ping the map for your team |
+| `!` | Ping: tap `!`, then tap the spot to signal, either on the screen or on the minimap. Your team sees a beacon. |
 | ⏸ | Pause or quit |
 
 ## What's in the game (compared with the design doc)
@@ -65,10 +73,15 @@ The APK is created at `app/build/outputs/apk/debug/app-debug.apk`. You can copy 
 
 **Interactive props**: jump pads, fans, speed pads, swinging doors, collapsing floors, conveyor belts, player cannons, explosive barrels, slime canisters, fire hydrants (the water jet pushes you), ziplines, ladders, destructible cardboard and glass, claw machines (random weapon), elevators and moving platforms, teleporters, pendulum blades, giant mouse traps and spinning bars. There are also more than 30 decorative props.
 
+**Graphics**: the characters and props use volumetric 3D-style toon shading, with light from the top-left, shaded volumes and specular highlights. Heroes lean into their runs and show their **back** when walking away from the camera. The ground uses procedurally painted textures for each biome (grass blades, paving, metal plates, snow sparkles…). Walls cast soft **drop shadows**, and the game adds contact shadows, glowing projectiles, explosion flashes and a cinematic vignette. The colors come from the **Tailwind CSS palette**. Tailwind is a web CSS framework and can't run inside a native Android game, so its exact color scales were ported (`core/Tw.kt`) along with Tailwind-style gradient buttons and frosted-glass panels. Heroes are chosen on a **3D rotating wheel**: drag or fling it, or tap a hero.
+
 **UI and effects**: bouncing damage numbers, hit markers, pings, a kill cam, spectator mode, a victory podium with an emote, confetti on eliminations, weapon trails, shockwaves, cartoon smoke and stun stars. The look is bloodless and cel-shaded with ink outlines. The game also has a minimap, a kill feed, and progression (coins, trophies, XP, levels, skins).
 
 ## What is *not* included, and why
-The design doc recommends Unity, Photon/Fish-Networking, dedicated servers (Edgegap, Multiplay) and PlayFab or Nakama. All of these need paid accounts, server hosting and API keys. That can't be delivered as source code you simply open in Android Studio. As the doc itself suggests for a first version, **every match is played against bots**, from 4 to 40 players depending on the mode. The simulation is fully deterministic per frame on one device. Adding online multiplayer later would mean adding a network layer (an authoritative host plus client prediction) on top of `Match`.
+The design doc recommends Unity, Photon/Fish-Networking, dedicated servers (Edgegap, Multiplay) and PlayFab or Nakama. All of these need paid accounts, server hosting and API keys, so **online play over the Internet** is not included. Multiplayer is **local** (Wi-Fi and Bluetooth), and bots fill the remaining slots.
+
+## Ready-made APK
+`apk/StarGuysBattle.apk` is a prebuilt debug build of this exact code. Copy it to an Android phone (Android 7+) and open it to install.
 
 ## Project structure
 ```
@@ -78,6 +91,7 @@ app/src/main/java/com/starguys/battle/
   game/                  engine: tiles/maps, physics bodies, fighters, heroes & art, weapons, supers,
                          projectiles, props, vehicles, mobs & bosses, bots (A* pathfinding), FX, HUD
   modes/                 the 19 game modes
+  net/                   local multiplayer: framed links, host/client sessions, lockstep, Wi-Fi & Bluetooth transports
   creative/              level format (share codes) and the editor
   ui/                    menus, lobby, hero select, settings, results
 ```

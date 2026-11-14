@@ -11,7 +11,7 @@ import com.starguys.battle.core.dist
 import com.starguys.battle.core.len
 import com.starguys.battle.core.sinf
 import kotlin.math.abs
-import kotlin.math.atan2
+import com.starguys.battle.core.atan2
 
 class Vehicle(m: Match, val kind: Int, px: Float, py: Float) : Body(m) {
     companion object {

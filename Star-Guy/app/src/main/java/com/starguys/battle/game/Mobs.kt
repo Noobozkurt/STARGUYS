@@ -2,6 +2,7 @@ package com.starguys.battle.game
 
 import android.graphics.Canvas
 import com.starguys.battle.core.G
+import com.starguys.battle.core.pickOrNull
 import com.starguys.battle.core.Sfx
 import com.starguys.battle.core.ang
 import com.starguys.battle.core.chance
@@ -134,7 +135,7 @@ open class Mob(m: Match, val kind: Int, var size: Int = 2) : Actor(m) {
         val k = minOf(1f, 8f * dt)
         vx += (pf.dirX * s - vx) * k; vy += (pf.dirY * s - vy) * k
         if (pf.needJump && onGround) vz = 400f
-        if (len(vx, vy) > 10f) face = kotlin.math.atan2(vy, vx)
+        if (len(vx, vy) > 10f) face = com.starguys.battle.core.atan2(vy, vx)
     }
 
     open fun think(dt: Float) {
@@ -415,7 +416,7 @@ class Boss(m: Match, kind: Int) : Mob(m, kind) {
                         b.hurt(650f, this, cosf(a + 1.57f) * 1000f, sinf(a + 1.57f) * 1000f); (b as? Actor)?.ragdollT = 0.5f } } }
                 if (stateT <= 0f) next(0, 1f) }
             5 -> { if (stateT <= 0f) { val n = if (phase2) 9 else 6
-                for (k in 0 until n) { val tgt = m.liveTargets().randomOrNull(); val px = (tgt?.x ?: x) + rf(-2f * T, 2f * T); val py = (tgt?.y ?: y) + rf(-2f * T, 2f * T)
+                for (k in 0 until n) { val tgt = m.liveTargets().pickOrNull(); val px = (tgt?.x ?: x) + rf(-2f * T, 2f * T); val py = (tgt?.y ?: y) + rf(-2f * T, 2f * T)
                     m.addZone(Zone(m, Zone.METEOR, px, py, 0.9f * T, 1.4f + rf() * 0.6f, this, TEAM_MOBS)) }
                 next(0, 2.5f / sp) } }
         }

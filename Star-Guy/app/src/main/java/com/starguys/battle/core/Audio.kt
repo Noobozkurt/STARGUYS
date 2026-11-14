@@ -167,7 +167,7 @@ object Sfx {
                 1 -> if (p < duty) 1f else -1f
                 2 -> 2f * p - 1f
                 3 -> if (p < 0.5f) 4f * p - 1f else 3f - 4f * p
-                else -> { if (i % maxOf(1, (SR / maxOf(f, 1f)).toInt()) == 0) noise = rf(-1f, 1f); noise }
+                else -> { if (i % maxOf(1, (SR / maxOf(f, 1f)).toInt()) == 0) noise = frf(-1f, 1f); noise }
             }
             val env = (if (t < attack) t / attack else 1f) * exp(-decay * t).toFloat() * (1f - k * 0.2f)
             out[idx] += v * vol * env

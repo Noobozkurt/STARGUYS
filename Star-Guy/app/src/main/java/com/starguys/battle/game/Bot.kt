@@ -11,12 +11,12 @@ import com.starguys.battle.core.rf
 import com.starguys.battle.core.ri
 import com.starguys.battle.core.sinf
 import kotlin.math.abs
-import kotlin.math.atan2
+import com.starguys.battle.core.atan2
 
 /** Bot brain for AI-controlled heroes. */
 class Bot(val f: Fighter) {
     private val m = f.m
-    private val diff = Save.difficulty
+    private val diff = f.m.cfg.difficulty
     private val reaction = floatArrayOf(0.42f, 0.26f, 0.14f)[diff]
     private val aimErr = floatArrayOf(0.28f, 0.14f, 0.05f)[diff]
     private val vision = 9f * T

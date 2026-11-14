@@ -214,7 +214,7 @@ object MapGen {
         // lakes
         val liquid = when (biome) { Biome.VOLCANO -> Tl.LAVA; Biome.SPACE -> Tl.VOID; Biome.SNOW -> Tl.ICE; else -> Tl.WATER }
         for (i in 0 until 3 + w / 30) blob(mp, ri(6, w - 7), ri(6, h - 7), rf(2.5f, 4.5f), liquid)
-        if (biome == Biome.BEACH) { for (y in 1 until h - 1) for (x in 1 until 6 + (kotlin.math.sin(y * 0.3) * 2).toInt()) mp.set(x, y, Tl.WATER) }
+        if (biome == Biome.BEACH) { for (y in 1 until h - 1) for (x in 1 until 6 + (com.starguys.battle.core.sinf(y * 0.3f) * 2f).toInt()) mp.set(x, y, Tl.WATER) }
         // villages
         val nb = 6 + w / 16
         for (i in 0 until nb) {

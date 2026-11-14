@@ -15,7 +15,7 @@ import com.starguys.battle.core.cosf
 import com.starguys.battle.core.dist
 import com.starguys.battle.core.len
 import com.starguys.battle.core.sinf
-import kotlin.math.atan2
+import com.starguys.battle.core.atan2
 
 /** On-screen controls (twin sticks + buttons) and all HUD drawing. */
 class Hud(val m: Match) {
@@ -81,12 +81,32 @@ class Hud(val m: Match) {
     private val p get() = m.player
 
     // ------------------------------------------------------------------ input
+    /** Local player's input; consumed by the match (single player) or sent over the network (multiplayer). */
+    val input = PlayerInput()
+    fun takeInput(): PlayerInput = input.snapshot()
+    /** Ping mode: tap the "!" button, then tap the spot (world or minimap) to signal. */
+    var pingMode = false
+    private var pingHintT = 0f
+    /** multiplayer pause menu (the match keeps running) */
+    var menuOpen = false
+    var quitCb: (() -> Unit)? = null
+    private var mmX = 0f; private var mmY = 0f; private var mmW = 0f; private var mmH = 0f; private var mmS = 1f
+
+    private fun screenToWorld(sx: Float, sy: Float): FloatArray {
+        val z = m.cam.zoom
+        return floatArrayOf((sx - W / 2 - m.cam.sx) / z + m.cam.x, (sy - H / 2 - m.cam.sy) / z + m.cam.y)
+    }
+
     fun touch(e: TouchEvt) {
         val pl = p
-        if (m.paused) {
+        if (m.paused || menuOpen) {
             if (e.action == TouchEvt.UP) {
-                if (hitRect(B_RESUME, e.x, e.y)) { m.paused = false; Sfx.play(Sfx.CLICK) }
-                else if (hitRect(B_QUIT, e.x, e.y)) { Sfx.play(Sfx.CLICK); m.paused = false; m.finish(false, "Abandon"); m.mode.endT = 0.01f }
+                if (hitRect(B_RESUME, e.x, e.y)) { m.paused = false; menuOpen = false; Sfx.play(Sfx.CLICK) }
+                else if (hitRect(B_QUIT, e.x, e.y)) {
+                    Sfx.play(Sfx.CLICK); m.paused = false; menuOpen = false
+                    val q = quitCb
+                    if (q != null) q() else { m.finish(false, "Abandon"); m.mode.endT = 0.01f }
+                }
             }
             return
         }
@@ -98,6 +118,15 @@ class Hud(val m: Match) {
                     if (!btnVisible(id)) continue
                     val b = btnPos(id)
                     if (dist(e.x, e.y, b[0], b[1]) < b[2] * 1.25f) { btnPid[e.id] = id; pressed = id; onButton(id); return }
+                }
+                if (pingMode && pl != null && !pl.out) {
+                    // second tap: where to signal (minimap or world)
+                    val wpt = if (e.x in mmX..(mmX + mmW) && e.y in mmY..(mmY + mmH)) floatArrayOf((e.x - mmX) / mmS, (e.y - mmY) / mmS)
+                    else screenToWorld(e.x, e.y)
+                    input.add(PlayerInput.PING, clamp(wpt[0], 0f, m.map.pxW), clamp(wpt[1], 0f, m.map.pxH))
+                    pingMode = false
+                    btnPid[e.id] = -1
+                    return
                 }
                 if (pl != null && !pl.out) {
                     if (dist(e.x, e.y, supX(), supY()) < supR() * 1.3f && sPid < 0) { sPid = e.id; sDx = 0f; sDy = 0f; sT = 0f; return }
@@ -116,7 +145,7 @@ class Hud(val m: Match) {
             TouchEvt.UP -> {
                 if (btnPid.remove(e.id) != null) { pressed = -1; return }
                 when (e.id) {
-                    mPid -> { mPid = -1; pl?.moveX = 0f; pl?.moveY = 0f }
+                    mPid -> { mPid = -1; input.mx = 0f; input.my = 0f }
                     aPid -> { aPid = -1; releaseAttack(e.x > -9000f) }
                     sPid -> { sPid = -1; releaseSuper(e.x > -9000f) }
                 }
@@ -150,12 +179,12 @@ class Hud(val m: Match) {
     private fun onButton(id: Int) {
         val pl = p
         when (id) {
-            B_PAUSE -> { m.paused = true; Sfx.play(Sfx.CLICK) }
-            B_PING -> if (pl != null && !pl.out) m.addPing(pl.x + cosf(pl.face) * 4f * T, pl.y + sinf(pl.face) * 4f * T, pl.team)
-            B_JUMP -> pl?.jump()
-            B_GADGET -> pl?.useGadget(if (aPid >= 0 && len(aDx, aDy) > 10f) atan2(aDy, aDx) else pl.face)
-            B_ITEM -> pl?.useItem()
-            B_USE -> if (pl != null) m.interact(pl)
+            B_PAUSE -> { if (m.cfg.net) menuOpen = true else m.paused = true; Sfx.play(Sfx.CLICK) }
+            B_PING -> { pingMode = !pingMode; pingHintT = 0f; Sfx.play(Sfx.CLICK) }
+            B_JUMP -> input.add(PlayerInput.JUMP)
+            B_GADGET -> if (pl != null) input.add(PlayerInput.GADGET, if (aPid >= 0 && len(aDx, aDy) > 10f) atan2(aDy, aDx) else pl.face)
+            B_ITEM -> input.add(PlayerInput.ITEM)
+            B_USE -> input.add(PlayerInput.INTERACT)
             B_PREV, B_NEXT -> cycleSpectate(if (id == B_NEXT) 1 else -1)
         }
     }
@@ -179,7 +208,7 @@ class Hud(val m: Match) {
             if (aT < 0.4f) autoFire(pl, w.range, w.aim, false)
         } else if (!w.auto) {
             val a = atan2(aDy, aDx)
-            pl.attack(a, mag * w.range * T * pl.rangeMul())
+            input.add(PlayerInput.ATTACK, a, mag * w.range * T * pl.rangeMul())
         }
     }
 
@@ -189,7 +218,7 @@ class Hud(val m: Match) {
         val h = pl.hero
         val mag = superMag()
         if (mag < 0.22f) autoFire(pl, h.superRange, h.superAim, true)
-        else pl.useSuper(atan2(sDy, sDx), mag * h.superRange * T)
+        else input.add(PlayerInput.SUPER, atan2(sDy, sDx), mag * h.superRange * T)
     }
 
     private fun autoFire(pl: Fighter, rangeTiles: Float, aim: Aim, sup: Boolean) {
@@ -201,7 +230,8 @@ class Hud(val m: Match) {
             val tx = tg.x + tg.vx * lead * 0.7f; val ty = tg.y + tg.vy * lead * 0.7f
             a = ang(pl.x, pl.y, tx, ty); d = dist(pl.x, pl.y, tx, ty)
         }
-        if (sup) { if (aim == Aim.SELF) pl.useSuper(pl.face, 0f) else pl.useSuper(a, d) } else pl.attack(a, d)
+        if (sup) { if (aim == Aim.SELF) input.add(PlayerInput.SUPER, pl.face, 0f) else input.add(PlayerInput.SUPER, a, d) }
+        else input.add(PlayerInput.ATTACK, a, d)
     }
 
     fun autoTarget(pl: Fighter, range: Float): Body? {
@@ -223,29 +253,32 @@ class Hud(val m: Match) {
         if (hitT > 0) hitT -= dt
         if (blindT > 0) blindT -= dt
         if (bigT > 0) bigT -= dt
+        pingHintT += dt
         aT += dt; sT += dt
-        val pl = p ?: return
-        if (pl.out) { pl.moveX = 0f; pl.moveY = 0f; return }
+        val pl = p
+        if (pl == null || pl.out) { input.mx = 0f; input.my = 0f; input.aiming = false; input.hold = false; pingMode = false; return }
         if (mPid >= 0) {
             var dx = mKx - mOx; var dy = mKy - mOy
             val r = 70f * u * sizeMul
             val l = len(dx, dy)
             if (l > r) { mOx = mKx - dx / l * r; mOy = mKy - dy / l * r; dx = mKx - mOx; dy = mKy - mOy }
             val mag = clamp(len(dx, dy) / r, 0f, 1f)
-            if (mag < 0.12f) { pl.moveX = 0f; pl.moveY = 0f } else {
+            if (mag < 0.12f) { input.mx = 0f; input.my = 0f } else {
                 val a = atan2(dy, dx)
-                pl.moveX = cosf(a) * mag.coerceAtLeast(0.55f); pl.moveY = sinf(a) * mag.coerceAtLeast(0.55f)
+                input.mx = cosf(a) * mag.coerceAtLeast(0.55f); input.my = sinf(a) * mag.coerceAtLeast(0.55f)
             }
+        } else { input.mx = 0f; input.my = 0f }
+        // aiming turns the hero; automatic weapons fire while held
+        input.aiming = false; input.hold = false
+        val w = pl.currentWeapon()
+        if (aPid >= 0 && aimMag() > 0.22f) {
+            input.aiming = true; input.aim = atan2(aDy, aDx)
+            if (w.auto) { input.hold = true; input.holdDist = aimMag() * w.range * T }
+        } else if (aPid >= 0 && aT > 0.4f && w.auto) {
+            val tg = autoTarget(pl, w.range * T)
+            if (tg != null) { input.aiming = true; input.hold = true; input.aim = ang(pl.x, pl.y, tg.x, tg.y); input.holdDist = dist(pl.x, pl.y, tg.x, tg.y) }
         }
-        // aiming turns the hero
-        if (aPid >= 0 && aimMag() > 0.22f) { pl.face = atan2(aDy, aDx); pl.aimT = 0f
-            val w = pl.currentWeapon()
-            if (w.auto) pl.attack(pl.face, aimMag() * w.range * T)
-        } else if (aPid >= 0 && aT > 0.4f && pl.currentWeapon().auto) {
-            val tg = autoTarget(pl, pl.currentWeapon().range * T)
-            if (tg != null) pl.attack(ang(pl.x, pl.y, tg.x, tg.y), dist(pl.x, pl.y, tg.x, tg.y))
-        }
-        if (sPid >= 0 && superMag() > 0.22f) { pl.face = atan2(sDy, sDx); pl.aimT = 0f }
+        if (sPid >= 0 && superMag() > 0.22f) { input.aiming = true; input.aim = atan2(sDy, sDx) }
         labelT -= dt
         if (labelT <= 0f) { useLabel = m.interactLabel(pl); labelT = 0.15f }
     }
@@ -311,7 +344,18 @@ class Hud(val m: Match) {
         drawMinimap(c)
         // pause & ping
         drawRoundBtn(c, B_PAUSE, 0xFF5B4B8A.toInt()) { x, y, s -> G.rect(c, x - s * 0.45f, y - s * 0.5f, x - s * 0.12f, y + s * 0.5f, G.WHITE, false); G.rect(c, x + s * 0.12f, y - s * 0.5f, x + s * 0.45f, y + s * 0.5f, G.WHITE, false) }
-        if (pl != null && !pl.out) drawRoundBtn(c, B_PING, 0xFFFFC23D.toInt()) { x, y, s -> G.text(c, "!", x, y + s * 0.4f, s * 1.2f, G.WHITE) }
+        if (pl != null && !pl.out) {
+            if (pingMode) {
+                val b = btnPos(B_PING)
+                G.ring(c, b[0], b[1], b[2] * (1.35f + 0.15f * sinf(m.time * 10f)), 4f * u, 0xFFFBBF24.toInt())
+                G.ring(c, mmX + mmW / 2, mmY + mmH / 2, maxOf(mmW, mmH) * 0.6f, 3f * u, G.alpha(0xFFFBBF24.toInt(), 0.5f + 0.5f * sinf(m.time * 8f)))
+                val hint = "Touche l'endroit à signaler (ou la mini-carte)"
+                val tw = G.textW(hint, 24f * u) + 40f * u
+                G.rrect(c, W / 2 - tw / 2, H * 0.25f - 30f * u, W / 2 + tw / 2, H * 0.25f + 14f * u, 20f * u, 0xDD78350F.toInt())
+                G.text(c, hint, W / 2, H * 0.25f, 24f * u, 0xFFFDE68A.toInt())
+            }
+            drawRoundBtn(c, B_PING, if (pingMode) 0xFFF59E0B.toInt() else 0xFFFBBF24.toInt()) { x, y, s -> G.text(c, "!", x, y + s * 0.4f, s * 1.2f, G.WHITE) }
+        }
         // kill feed
         for ((i, f) in feed.withIndex()) {
             G.fade = clamp(f.t, 0f, 1f)
@@ -341,7 +385,7 @@ class Hud(val m: Match) {
         }
         // edge markers for revealed enemies (radar) & pings
         drawEdgeMarkers(c, pl)
-        if (m.paused) drawPause(c)
+        if (m.paused || menuOpen) drawPause(c)
     }
 
     private fun drawSticks(c: Canvas, pl: Fighter) {
@@ -360,7 +404,9 @@ class Hud(val m: Match) {
         G.circle(c, ax, ay, ar, 0x33FF5E7E, false)
         G.ring(c, ax, ay, ar, 3f * u, 0x88FF9AB0.toInt())
         val kx = ax + aDx; val ky = ay + aDy
-        G.circle(c, if (aPid >= 0) kx else ax, if (aPid >= 0) ky else ay, ar * 0.5f, if (pl.canAttack() || pl.modeWeapon != null) 0xFFFF5E7E.toInt() else 0xFF8A6A78.toInt())
+        G.depth = true
+        G.circle(c, if (aPid >= 0) kx else ax, if (aPid >= 0) ky else ay, ar * 0.5f, if (pl.canAttack() || pl.modeWeapon != null) 0xFFF43F5E.toInt() else 0xFF8A6A78.toInt())
+        G.depth = false
         if (pl.weapon != null || pl.modeWeapon != null) Icons.weapon(c, w.id, if (aPid >= 0) kx else ax, if (aPid >= 0) ky else ay, ar * 0.32f)
         else G.star(c, if (aPid >= 0) kx else ax, if (aPid >= 0) ky else ay, ar * 0.22f, ar * 0.1f, 4, 0.78f, G.WHITE, false)
         // ammo text for pickup weapons
@@ -389,7 +435,7 @@ class Hud(val m: Match) {
         if (m.mode.percentMode) {
             G.text(c, "${pl.dmgPct.toInt()}%   ${"♥".repeat(pl.stocks.coerceAtLeast(0))}", hx + hw / 2, hy + 18f * u, 20f * u, G.mix(G.WHITE, 0xFFFF3D3D.toInt(), clamp(pl.dmgPct / 150f, 0f, 1f)))
         } else {
-            G.rrect(c, hx + 3f * u, hy + 3f * u, hx + 3f * u + (hw - 6f * u) * clamp(pl.hp / pl.maxHp, 0f, 1f), hy + 19f * u, 8f * u, 0xFF7CFF8A.toInt(), false)
+            G.vgrad(c, hx + 3f * u, hy + 3f * u, hx + 3f * u + (hw - 6f * u) * clamp(pl.hp / pl.maxHp, 0.02f, 1f), hy + 19f * u, 8f * u, 0xFF86EFAC.toInt(), 0xFF16A34A.toInt())
             G.text(c, "${pl.hp.toInt()}", hx + hw / 2, hy + 18f * u, 17f * u, G.WHITE)
         }
         G.text(c, "${pl.hero.name}", hx, hy - 8f * u, 20f * u, G.WHITE, android.graphics.Paint.Align.LEFT)
@@ -400,9 +446,11 @@ class Hud(val m: Match) {
         val pr = pressed == id
         val r = b[2]
         G.ow = 3f * u
-        G.circle(c, b[0], b[1] + 4f * u, r, G.shade(col, 0.55f))
+        G.glow(c, b[0], b[1], r * 1.6f, G.alpha(col, 0.35f))
+        G.circle(c, b[0], b[1] + 4f * u, r, G.shade(col, 0.5f))
+        G.depth = true
         G.circle(c, b[0], b[1] + (if (pr) 3f * u else 0f), r, col)
-        G.circle(c, b[0] - r * 0.3f, b[1] - r * 0.35f, r * 0.25f, 0x44FFFFFF, false)
+        G.depth = false
         icon(b[0], b[1] + (if (pr) 3f * u else 0f), r * 0.75f)
     }
 
@@ -425,12 +473,13 @@ class Hud(val m: Match) {
             drawRoundBtn(c, B_NEXT, 0xFF5B4B8A.toInt()) { x, y, sz -> G.text(c, "▶", x, y + sz * 0.35f, sz, G.WHITE) }
             G.text(c, "Pause ▸ Quitter pour abandonner", W / 2, H - 12f * u, 15f * u, 0xAAFFFFFF.toInt())
         }
-        if (m.paused) drawPause(c)
+        if (m.paused || menuOpen) drawPause(c)
     }
 
     private fun drawPause(c: Canvas) {
         G.rect(c, 0f, 0f, W, H, 0xAA000000.toInt(), false)
-        G.text(c, "PAUSE", W / 2, H / 2 - 130f * u, 60f * u, G.WHITE)
+        G.text(c, if (m.cfg.net) "MENU" else "PAUSE", W / 2, H / 2 - 130f * u, 60f * u, G.WHITE)
+        if (m.cfg.net) G.text(c, "La partie continue en multijoueur !", W / 2, H / 2 + 160f * u, 22f * u, 0xFFFDE68A.toInt())
         G.text(c, m.mode.let { com.starguys.battle.modes.Modes.def(m.cfg.mode).name }, W / 2, H / 2 - 90f * u, 24f * u, 0xFFFFF3B0.toInt())
         for (id in intArrayOf(B_RESUME, B_QUIT)) {
             val b = btnPos(id)
@@ -491,6 +540,7 @@ class Hud(val m: Match) {
         val mw = if (aspect >= 1f) size else size * aspect
         val mh = if (aspect >= 1f) size / aspect else size
         val mx = W - mw - 16f * u; val my = 14f * u
+        mmX = mx; mmY = my; mmW = mw; mmH = mh; mmS = mw / mp.pxW
         G.ow = 3f * u
         G.rrect(c, mx - 4f * u, my - 4f * u, mx + mw + 4f * u, my + mh + 4f * u, 8f * u, 0xAA1B1530.toInt())
         val bmp = minimap

@@ -3,7 +3,7 @@ package com.starguys.battle.game
 import android.graphics.Canvas
 import com.starguys.battle.core.G
 import com.starguys.battle.core.cosf
-import com.starguys.battle.core.rf
+import com.starguys.battle.core.frf
 import com.starguys.battle.core.sinf
 import kotlin.math.roundToInt
 
@@ -23,7 +23,7 @@ class Fx(val m: Match) {
     private fun add(kind: Int, x: Float, y: Float, vx: Float, vy: Float, life: Float, size: Float, color: Int, g: Float = 0f): P {
         val q = p()
         q.kind = kind; q.x = x; q.y = y; q.vx = vx; q.vy = vy; q.life = life; q.max = life; q.size = size; q.color = color; q.g = g
-        q.rot = rf() * 6.28f; q.vr = rf(-8f, 8f); q.drag = 0f; q.text = ""
+        q.rot = frf() * 6.28f; q.vr = frf(-8f, 8f); q.drag = 0f; q.text = ""
         if (ps.size < 1400) ps.add(q)
         return q
     }
@@ -31,29 +31,31 @@ class Fx(val m: Match) {
     companion object {
         const val DOT = 0; const val CONF = 1; const val SMOKE = 2; const val RING = 3; const val NUM = 4; const val TEXT = 5
         const val LINE = 6; const val STAR = 7; const val ARC = 8; const val PIX = 9; const val DEBRIS = 10; const val FLAME = 11; const val DROP = 12
+        const val GLOW = 13
         val CONFETTI = intArrayOf(0xFFFF5E7E.toInt(), 0xFFFFE14D.toInt(), 0xFF6BD3FF.toInt(), 0xFF7CFF8A.toInt(), 0xFFB46CFF.toInt(), 0xFFFF9A3D.toInt())
     }
 
     fun confetti(x: Float, y: Float, n: Int) {
         for (i in 0 until n) {
-            val a = rf() * 6.28f; val s = rf(150f, 520f)
-            add(CONF, x, y, cosf(a) * s, sinf(a) * s - 250f, rf(0.8f, 1.6f), rf(5f, 9f), CONFETTI[i % CONFETTI.size], 700f).drag = 2f
+            val a = frf() * 6.28f; val s = frf(150f, 520f)
+            add(CONF, x, y, cosf(a) * s, sinf(a) * s - 250f, frf(0.8f, 1.6f), frf(5f, 9f), CONFETTI[i % CONFETTI.size], 700f).drag = 2f
         }
     }
 
     fun smoke(x: Float, y: Float, n: Int, color: Int) {
-        for (i in 0 until n) add(SMOKE, x + rf(-14f, 14f), y + rf(-8f, 8f), rf(-40f, 40f), rf(-70f, -20f), rf(0.5f, 0.9f), rf(9f, 16f), color)
+        for (i in 0 until n) add(SMOKE, x + frf(-14f, 14f), y + frf(-8f, 8f), frf(-40f, 40f), frf(-70f, -20f), frf(0.5f, 0.9f), frf(9f, 16f), color)
     }
 
     fun ring(x: Float, y: Float, r: Float, color: Int, life: Float = 0.35f) { add(RING, x, y, 0f, 0f, life, r, color) }
+    fun flash(x: Float, y: Float, r: Float, color: Int, life: Float = 0.3f) { add(GLOW, x, y, 0f, 0f, life, r, color) }
 
     fun hit(x: Float, y: Float, color: Int) {
-        for (i in 0 until 5) { val a = rf() * 6.28f; val s = rf(80f, 260f); add(DOT, x, y, cosf(a) * s, sinf(a) * s, 0.25f, 4f, color).drag = 4f }
+        for (i in 0 until 5) { val a = frf() * 6.28f; val s = frf(80f, 260f); add(DOT, x, y, cosf(a) * s, sinf(a) * s, 0.25f, 4f, color).drag = 4f }
         add(STAR, x, y, 0f, 0f, 0.15f, 14f, 0xFFFFFFFF.toInt())
     }
 
     fun number(x: Float, y: Float, v: Float, color: Int, prefix: String = "") {
-        val q = add(NUM, x + rf(-10f, 10f), y, rf(-30f, 30f), -230f, 0.85f, if (v > 999f) 26f else 21f, color, 500f)
+        val q = add(NUM, x + frf(-10f, 10f), y, frf(-30f, 30f), -230f, 0.85f, if (v > 999f) 26f else 21f, color, 500f)
         q.text = prefix + v.roundToInt().toString()
     }
 
@@ -71,8 +73,8 @@ class Fx(val m: Match) {
         var px = x1; var py = y1
         for (i in 1..5) {
             val k = i / 5f
-            val nx = x1 + (x2 - x1) * k + if (i < 5) rf(-12f, 12f) else 0f
-            val ny = y1 + (y2 - y1) * k + if (i < 5) rf(-12f, 12f) else 0f
+            val nx = x1 + (x2 - x1) * k + if (i < 5) frf(-12f, 12f) else 0f
+            val ny = y1 + (y2 - y1) * k + if (i < 5) frf(-12f, 12f) else 0f
             line(px, py, nx, ny, color, 0.18f, 4f)
             px = nx; py = ny
         }
@@ -83,21 +85,21 @@ class Fx(val m: Match) {
     }
 
     fun pixels(x: Float, y: Float, color: Int) {
-        for (i in 0 until 14) { val a = rf() * 6.28f; val s = rf(60f, 260f); add(PIX, x, y, cosf(a) * s, sinf(a) * s, rf(0.3f, 0.6f), rf(5f, 9f), color).drag = 3f }
+        for (i in 0 until 14) { val a = frf() * 6.28f; val s = frf(60f, 260f); add(PIX, x, y, cosf(a) * s, sinf(a) * s, frf(0.3f, 0.6f), frf(5f, 9f), color).drag = 3f }
     }
 
     fun debris(x: Float, y: Float, color: Int) {
-        for (i in 0 until 10) { val a = rf() * 6.28f; val s = rf(120f, 380f); add(DEBRIS, x, y, cosf(a) * s, sinf(a) * s - 200f, rf(0.5f, 0.9f), rf(6f, 11f), color, 900f) }
+        for (i in 0 until 10) { val a = frf() * 6.28f; val s = frf(120f, 380f); add(DEBRIS, x, y, cosf(a) * s, sinf(a) * s - 200f, frf(0.5f, 0.9f), frf(6f, 11f), color, 900f) }
     }
 
     fun splat(x: Float, y: Float, color: Int) {
-        for (i in 0 until 12) { val a = rf() * 6.28f; val s = rf(100f, 300f); add(DOT, x, y, cosf(a) * s, sinf(a) * s - 150f, rf(0.4f, 0.7f), rf(5f, 10f), color, 800f) }
+        for (i in 0 until 12) { val a = frf() * 6.28f; val s = frf(100f, 300f); add(DOT, x, y, cosf(a) * s, sinf(a) * s - 150f, frf(0.4f, 0.7f), frf(5f, 10f), color, 800f) }
     }
 
-    fun flameBit(x: Float, y: Float) { add(FLAME, x + rf(-8f, 8f), y, rf(-20f, 20f), rf(-80f, -40f), 0.4f, rf(5f, 8f), 0xFFFF7A3D.toInt()) }
+    fun flameBit(x: Float, y: Float) { add(FLAME, x + frf(-8f, 8f), y, frf(-20f, 20f), frf(-80f, -40f), 0.4f, frf(5f, 8f), 0xFFFF7A3D.toInt()) }
     fun wind(x: Float, y: Float, dir: Float) { add(LINE, x, y, cosf(dir) * 300f, sinf(dir) * 300f, 0.3f, 2f, 0x66FFFFFF).also { it.x2 = x + cosf(dir) * 26f; it.y2 = y + sinf(dir) * 26f } }
-    fun drop(x: Float, y: Float, dir: Float) { add(DROP, x, y, cosf(dir) * rf(200f, 400f), sinf(dir) * rf(200f, 400f) - 80f, 0.6f, 5f, 0xFF6BD3FF.toInt(), 300f) }
-    fun stars(x: Float, y: Float, n: Int, color: Int) { for (i in 0 until n) { val a = rf() * 6.28f; val s = rf(60f, 200f); add(STAR, x, y, cosf(a) * s, sinf(a) * s, 0.6f, 9f, color).drag = 3f } }
+    fun drop(x: Float, y: Float, dir: Float) { add(DROP, x, y, cosf(dir) * frf(200f, 400f), sinf(dir) * frf(200f, 400f) - 80f, 0.6f, 5f, 0xFF6BD3FF.toInt(), 300f) }
+    fun stars(x: Float, y: Float, n: Int, color: Int) { for (i in 0 until n) { val a = frf() * 6.28f; val s = frf(60f, 200f); add(STAR, x, y, cosf(a) * s, sinf(a) * s, 0.6f, 9f, color).drag = 3f } }
 
     fun update(dt: Float) {
         var i = 0
@@ -144,6 +146,7 @@ class Fx(val m: Match) {
                 DEBRIS -> { c.save(); c.translate(q.x, q.y); c.rotate(q.rot * 57f); G.ow = 2f; G.rect(c, -q.size / 2, -q.size / 2, q.size / 2, q.size / 2, q.color, true); c.restore() }
                 FLAME -> G.circle(c, q.x, q.y, q.size * k + 1f, G.mix(0xFFFFE14D.toInt(), 0xFFFF5E3D.toInt(), 1f - k), false)
                 DROP -> G.circle(c, q.x, q.y, q.size, G.alpha(q.color, k), false)
+                GLOW -> G.glow(c, q.x, q.y, q.size * (1.25f - k * 0.5f), G.alpha(q.color, k))
             }
         }
     }
@@ -169,7 +172,7 @@ class Camera {
         zoom += (targetZoom - zoom) * minOf(1f, dt * 3f)
         if (shakeAmt > 0f) {
             shakeAmt = maxOf(0f, shakeAmt - dt * 30f)
-            sx = rf(-shakeAmt, shakeAmt); sy = rf(-shakeAmt, shakeAmt)
+            sx = frf(-shakeAmt, shakeAmt); sy = frf(-shakeAmt, shakeAmt)
         } else { sx = 0f; sy = 0f }
     }
 

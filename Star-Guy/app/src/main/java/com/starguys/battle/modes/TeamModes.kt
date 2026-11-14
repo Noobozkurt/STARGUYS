@@ -2,6 +2,7 @@ package com.starguys.battle.modes
 
 import android.graphics.Canvas
 import com.starguys.battle.core.G
+import com.starguys.battle.core.pickOrNull
 import com.starguys.battle.core.Sfx
 import com.starguys.battle.core.chance
 import com.starguys.battle.core.cosf
@@ -148,7 +149,7 @@ class KothMode(m: Match) : GameMode(m) {
         val inside = m.fighters.filter { !it.out && dist(it.x, it.y, hx, hy) < hr }
         holder = if (inside.size == 1) inside[0] else null
         tick -= dt
-        if (tick <= 0f) { tick = 1f; holder?.let { it.score += 1f; if (it.human) Sfx.play(Sfx.COIN, 0.4f) } }
+        if (tick <= 0f) { tick = 1f; holder?.let { it.score += 1f; if (it.isLocal) Sfx.play(Sfx.COIN, 0.4f) } }
         val lead = m.fighters.maxByOrNull { it.score }
         if (lead != null && lead.score >= goalPts) { m.finish(lead === m.player, "${lead.name} est le roi !"); return }
         if (tickTimer(dt)) { m.finish(ranking().firstOrNull() === m.player, "Temps écoulé !") }
@@ -214,7 +215,7 @@ class HeistMode(m: Match) : GameMode(m) {
     override fun canPickup(f: Fighter, p: Pickup): Boolean {
         if (p.kind != Pickup.GOLD) return true
         if (f.team == 0) {
-            if (f.carry == 0) { f.carry = 1; p.alive = false; Sfx.play(Sfx.COIN, 0.5f); if (f.human) m.hud.toastSmall("Ramène le lingot au camion !") }
+            if (f.carry == 0) { f.carry = 1; p.alive = false; Sfx.play(Sfx.COIN, 0.5f); if (f.isLocal) m.hud.toastSmall("Ramène le lingot au camion !") }
             return false
         } else {
             // defenders return dropped gold to the vault
@@ -364,7 +365,7 @@ class InfectionMode(m: Match) : GameMode(m) {
         f.spawnShield = 1f
         m.fx.splat(f.x, f.y - 30f, 0xFF7BE84A.toInt()); Sfx.play(Sfx.SPLASH, 0.6f)
         m.hud.feed("${f.name} est infecté !", 0xFF7BE84A.toInt())
-        if (f.human) m.hud.big("TU ES INFECTÉ ! CONTAMINE-LES !", 0xFF7BE84A.toInt(), 2.5f)
+        if (f.isLocal) m.hud.big("TU ES INFECTÉ ! CONTAMINE-LES !", 0xFF7BE84A.toInt(), 2.5f)
     }
 
     override fun canPickup(f: Fighter, p: Pickup) = !f.infected
@@ -523,8 +524,8 @@ class PropHuntMode(m: Match) : GameMode(m) {
         // keep hiders disguised (they reveal when moving fast)
         for (f in m.fighters) if (f.team == 0 && !f.out && f.disguise < 0) f.disguise = Decor.DISGUISES.pick()
         val hiders = m.fighters.count { !it.out && it.team == 0 }
-        if (hiders == 0) { m.finish(playerTeam == 1, "Tous les cachés sont trouvés !"); return }
-        if (tickTimer(dt)) m.finish(playerTeam == 0, "Les cachés ont survécu !")
+        if (hiders == 0) { m.finish(m.player?.team == 1, "Tous les cachés sont trouvés !"); return }
+        if (tickTimer(dt)) m.finish(m.player?.team == 0, "Les cachés ont survécu !")
     }
 
     private fun f0() = false
@@ -551,7 +552,7 @@ class PropHuntMode(m: Match) : GameMode(m) {
             if (f.lastHurtT < 1.5f) { g.flee = true; g.has = true; g.target = m.fighters.firstOrNull { it.team == 1 && !it.out }; g.urgency = 1f; return true }
             if (hideT > 4f && f.brain != null) {
                 if (f.lastMoveT < 0.1f || dist(f.x, f.y, f.safeX, f.safeY) >= 0f) {
-                    val pr = m.props.filter { it is Decor }.randomOrNull()
+                    val pr = m.props.filter { it is Decor }.pickOrNull()
                     if (pr != null && rf() < 0.03f) return g.set(pr.x + rf(-50f, 50f), pr.y + rf(-50f, 50f), 1f)
                 }
             }
@@ -566,7 +567,7 @@ class PropHuntMode(m: Match) : GameMode(m) {
         if (susp != null && chance(0.8f)) { g.target = susp; return g.set(susp.x, susp.y, 0.5f) }
         if (near.isNotEmpty() && chance(0.25f)) { g.target = near.pick(); return g.set(g.target!!.x, g.target!!.y, 0.5f) }
         if (chance(0.25f)) {
-            val pr = m.props.filter { it is Decor && dist(f.x, f.y, it.x, it.y) < 5f * T }.randomOrNull()
+            val pr = m.props.filter { it is Decor && dist(f.x, f.y, it.x, it.y) < 5f * T }.pickOrNull()
             if (pr != null) { g.target = pr; return g.set(pr.x, pr.y, 0.4f) }
         }
         return false
@@ -579,7 +580,7 @@ class PropHuntMode(m: Match) : GameMode(m) {
         val hiders = m.fighters.count { !it.out && it.team == 0 }
         if (hideT > 0f) h.topPill(c, "Cachez-vous ! ${hideT.toInt() + 1} s", 0xCC2A2140.toInt())
         else h.topPill(c, "${timeStr()}   ·   Cachés restants : $hiders", 0xCC2A2140.toInt())
-        h.topText(c, if (playerTeam == 0) "Tu es caché : reste immobile !" else "Tu es chasseur : tirer sur un vrai objet coûte des PV", 2, 0xFFFFF3B0.toInt(), 18f)
+        h.topText(c, if (m.player?.team == 0) "Tu es caché : reste immobile !" else "Tu es chasseur : tirer sur un vrai objet coûte des PV", 2, 0xFFFFF3B0.toInt(), 18f)
     }
 }
 

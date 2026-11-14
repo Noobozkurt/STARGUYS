@@ -74,7 +74,7 @@ class CastleMode(m: Match) : GameMode(m) {
             buildT -= dt
             // bots build barricades near gates
             for (f in m.fighters) if (!f.human && !f.out && (bricks[f] ?: 0) > 0 && chance(dt * 0.6f)) {
-                val gx = core.x + listOf(0f, 0f, -7f * T, 7f * T).random(); val gy = core.y + listOf(-5f * T, 5f * T, 0f, 0f).random()
+                val gi = ri(4); val gx = core.x + floatArrayOf(0f, 0f, -7f * T, 7f * T)[gi]; val gy = core.y + floatArrayOf(-5f * T, 5f * T, 0f, 0f)[gi]
                 placeBrick(f, gx + rf(-2f * T, 2f * T), gy + rf(-2f * T, 2f * T))
             }
             if (buildT <= 0f) startWave()
@@ -193,7 +193,7 @@ class EscapeMode(m: Match) : GameMode(m) {
                 f.finished = true; f.out = true; order++; f.place = order; f.score = countdown
                 m.fx.confetti(f.x, f.y - 40f, 40); Sfx.play(Sfx.PICKUP)
                 m.hud.feed("${f.name} s'est échappé ! (#$order)", 0xFF7CFF8A.toInt())
-                if (f.human) m.hud.big("ÉCHAPPÉ !", 0xFF7CFF8A.toInt(), 2f)
+                if (f.isLocal) m.hud.big("ÉCHAPPÉ !", 0xFF7CFF8A.toInt(), 2f)
             }
         }
         for (mb in m.mobs) if (mb.x < waveX) mb.hurt(99999f, m.envBody, 0f, 0f)

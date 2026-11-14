@@ -29,7 +29,7 @@ object HeroArt {
             0 -> { // Gumbo
                 if (superOn) {
                     G.circle(c, 0f, -34f, 36f, G.alpha(G.light(col, 0.2f), 0.85f))
-                    G.circle(c, -14f, -50f, 9f, 0xAAFFFFFF.toInt(), false)
+                    if (!G.noFace) { G.circle(c, -14f, -50f, 9f, 0xAAFFFFFF.toInt(), false) }
                     G.eyes(c, lx * 4f, -36f, 9f, 6f, lx, ly, bl)
                     G.smile(c, lx * 4f, -22f, 8f)
                     return
@@ -77,7 +77,7 @@ object HeroArt {
                 G.circle(c, lx * 4f, -46f - b, 13f, col)
                 G.circle(c, lx * 4f, -61f - b, 7f, 0xFFD8D8E0.toInt())
                 G.ow = 2f
-                G.ring(c, lx * 4f - 5f, -47f - b, 5.5f, 2f, G.INK); G.ring(c, lx * 4f + 5f, -47f - b, 5.5f, 2f, G.INK)
+                if (!G.noFace) { G.ring(c, lx * 4f - 5f, -47f - b, 5.5f, 2f, G.INK); G.ring(c, lx * 4f + 5f, -47f - b, 5.5f, 2f, G.INK) }
                 G.eyes(c, lx * 4f, -47f - b, 5f, 3.6f, lx, ly, bl)
                 G.ow = 3f
                 G.smile(c, lx * 4f, -39f - b, 4f)
@@ -91,10 +91,9 @@ object HeroArt {
                 G.rect(c, -18f, -48f - b, -9f, -39f - b, G.light(col, 0.3f), false)
                 for (s in intArrayOf(-1, 1)) {
                     val ex = s * 7f + lx * 3f
-                    if (bl) G.rect(c, ex - 4f, -31f - b, ex + 4f, -29f - b, G.INK, false)
-                    else { G.rect(c, ex - 4.5f, -36f - b, ex + 4.5f, -26f - b, G.WHITE); G.rect(c, ex - 1.5f + lx * 2f, -33f - b + ly * 2f, ex + 2.5f + lx * 2f, -28f - b + ly * 2f, G.INK, false) }
+                    if (!G.noFace) { if (bl) G.rect(c, ex - 4f, -31f - b, ex + 4f, -29f - b, G.INK, false) else { G.rect(c, ex - 4.5f, -36f - b, ex + 4.5f, -26f - b, G.WHITE); G.rect(c, ex - 1.5f + lx * 2f, -33f - b + ly * 2f, ex + 2.5f + lx * 2f, -28f - b + ly * 2f, G.INK, false) } }
                 }
-                G.rect(c, -4f, -20f - b, 4f, -17f - b, G.INK, false)
+                if (!G.noFace) { G.rect(c, -4f, -20f - b, 4f, -17f - b, G.INK, false) }
                 G.rect(c, -2f, -56f - b, 2f, -48f - b, G.INK, false); G.rect(c, -4f, -60f - b, 4f, -55f - b, 0xFFFFE14D.toInt())
             }
             4 -> { // Chef Boulette
@@ -104,7 +103,7 @@ object HeroArt {
                 G.rrect(c, -11f, -70f - b, 11f, -54f - b, 5f, G.WHITE)
                 G.circle(c, -7f, -70f - b, 6f, G.WHITE); G.circle(c, 7f, -70f - b, 6f, G.WHITE); G.circle(c, 0f, -74f - b, 7f, G.WHITE)
                 G.eyes(c, lx * 3f, -34f - b, 6f, 4.4f, lx, ly, bl)
-                G.oval(c, -11f, -27f - b, 3.5f, 2f, 0xFFFFB0B0.toInt(), false); G.oval(c, 11f, -27f - b, 3.5f, 2f, 0xFFFFB0B0.toInt(), false)
+                if (!G.noFace) { G.oval(c, -11f, -27f - b, 3.5f, 2f, 0xFFFFB0B0.toInt(), false); G.oval(c, 11f, -27f - b, 3.5f, 2f, 0xFFFFB0B0.toInt(), false) }
                 G.smile(c, lx * 3f, -27f - b, 4f)
             }
             5 -> { // Capitaine Bouchon
@@ -116,9 +115,9 @@ object HeroArt {
                 G.poly(c, 0xFF2A2433.toInt(), true, -22f, -50f - b, 22f, -50f - b, 12f, -66f - b, 0f, -60f - b, -12f, -66f - b)
                 G.circle(c, 0f, -56f - b, 3f, G.WHITE, false)
                 // eye + patch
-                G.oval(c, -6f + lx * 3, -30f - b, 4.5f, 5f, G.WHITE); G.circle(c, -6f + lx * 4.5f, -30f - b + ly * 1.5f, 2.3f, G.INK, false)
-                G.circle(c, 6f + lx * 3, -30f - b, 5f, G.INK, false)
-                G.line(c, -14f, -36f - b, 14f, -34f - b, 2f, G.INK)
+                if (!G.noFace) { G.oval(c, -6f + lx * 3, -30f - b, 4.5f, 5f, G.WHITE); G.circle(c, -6f + lx * 4.5f, -30f - b + ly * 1.5f, 2.3f, G.INK, false) }
+                if (!G.noFace) { G.circle(c, 6f + lx * 3, -30f - b, 5f, G.INK, false) }
+                if (!G.noFace) { G.line(c, -14f, -36f - b, 14f, -34f - b, 2f, G.INK) }
                 G.smile(c, lx * 3f, -21f - b, 4f)
             }
             6 -> { // Nuage
@@ -156,9 +155,9 @@ object HeroArt {
                 G.oval(c, 0f, -58f - b, 20f, 4f, 0xFF2A2433.toInt()); G.rrect(c, -8f, -68f - b, 8f, -57f - b, 3f, 0xFF2A2433.toInt())
                 G.line(c, 6f, -66f - b, 16f, -76f - b, 3f, 0xFFFF5E7E.toInt())
                 G.eyes(c, lx * 3f, -36f - b, 6.5f, 4.4f, lx, ly, bl)
-                G.line(c, -11f + lx * 3, -42f - b, -14f + lx * 3, -45f - b, 1.8f, G.INK); G.line(c, 11f + lx * 3, -42f - b, 14f + lx * 3, -45f - b, 1.8f, G.INK)
+                if (!G.noFace) { G.line(c, -11f + lx * 3, -42f - b, -14f + lx * 3, -45f - b, 1.8f, G.INK); G.line(c, 11f + lx * 3, -42f - b, 14f + lx * 3, -45f - b, 1.8f, G.INK) }
                 for (k in -2..2) G.circle(c, k * 5f, -22f - b + abs(k) * -1.2f, 2.2f, G.WHITE, false)
-                G.oval(c, lx * 3f, -28f - b, 3.5f, 2f, 0xFFE84545.toInt(), false)
+                if (!G.noFace) { G.oval(c, lx * 3f, -28f - b, 3.5f, 2f, 0xFFE84545.toInt(), false) }
             }
             9 -> { // Glitch
                 val gl = ((t * 7f).toInt() % 5 == 0)
@@ -168,9 +167,9 @@ object HeroArt {
                 G.oval(c, off, -30f - b, 16f, 24f, 0x88FF3D7A.toInt(), false)
                 G.oval(c, 0f, -30f - b, 16f, 24f, col)
                 if (gl) { G.rect(c, -18f, -38f - b, 14f, -33f - b, G.light(col, 0.4f), false); G.rect(c, -12f, -22f - b, 20f, -19f - b, G.shade(col, 0.6f), false) }
-                G.rect(c, -9f + lx * 3, -40f - b, -2f + lx * 3, -32f - b, G.WHITE); G.rect(c, -6.5f + lx * 4.5f, -38f - b, -3.5f + lx * 4.5f, -34f - b, G.INK, false)
-                G.oval(c, 6f + lx * 3, -36f - b, 4.5f, 5f, G.WHITE); G.circle(c, 6f + lx * 4.5f, -36f - b + ly, 2.3f, G.INK, false)
-                G.line(c, -6f, -22f - b, -2f, -24f - b, 2f, G.INK); G.line(c, -2f, -24f - b, 2f, -21f - b, 2f, G.INK); G.line(c, 2f, -21f - b, 6f, -23f - b, 2f, G.INK)
+                if (!G.noFace) { G.rect(c, -9f + lx * 3, -40f - b, -2f + lx * 3, -32f - b, G.WHITE); G.rect(c, -6.5f + lx * 4.5f, -38f - b, -3.5f + lx * 4.5f, -34f - b, G.INK, false) }
+                if (!G.noFace) { G.oval(c, 6f + lx * 3, -36f - b, 4.5f, 5f, G.WHITE); G.circle(c, 6f + lx * 4.5f, -36f - b + ly, 2.3f, G.INK, false) }
+                if (!G.noFace) { G.line(c, -6f, -22f - b, -2f, -24f - b, 2f, G.INK); G.line(c, -2f, -24f - b, 2f, -21f - b, 2f, G.INK); G.line(c, 2f, -21f - b, 6f, -23f - b, 2f, G.INK) }
             }
             10 -> { // Mamie Météo
                 feet(c, t, mv, 0xFF5A3A5E.toInt(), 7f)
@@ -179,7 +178,7 @@ object HeroArt {
                 G.circle(c, lx * 3f, -46f - b, 12f, SKIN)
                 G.circle(c, lx * 3f, -59f - b, 7f, 0xFFE0E0EA.toInt()); G.circle(c, -9f + lx * 3, -50f - b, 5f, 0xFFE0E0EA.toInt()); G.circle(c, 9f + lx * 3, -50f - b, 5f, 0xFFE0E0EA.toInt())
                 G.ow = 1.8f
-                G.ring(c, lx * 3f - 4.5f, -46f - b, 4.5f, 1.8f, G.INK); G.ring(c, lx * 3f + 4.5f, -46f - b, 4.5f, 1.8f, G.INK)
+                if (!G.noFace) { G.ring(c, lx * 3f - 4.5f, -46f - b, 4.5f, 1.8f, G.INK); G.ring(c, lx * 3f + 4.5f, -46f - b, 4.5f, 1.8f, G.INK) }
                 G.eyes(c, lx * 3f, -46f - b, 4.5f, 3f, lx, ly, bl)
                 G.ow = 3f
                 G.smile(c, lx * 3f, -40f - b, 3f)
@@ -201,9 +200,8 @@ object HeroArt {
                 G.rrect(c, -19f, -48f - b, 19f, -10f - b, 8f, col)
                 G.rrect(c, 12f, -46f - b, 19f, -12f - b, 6f, G.shade(col, 0.8f), false)
                 G.rect(c, 19f, -36f - b, 25f, -30f - b, 0xFF3A3A44.toInt())
-                G.rrect(c, -13f, -38f - b, 11f, -21f - b, 5f, 0xFF1E2A3A.toInt())
-                if (bl) { G.line(c, -8f, -29f - b, -3f, -29f - b, 2f, 0xFF7CF0FF.toInt()); G.line(c, 2f, -29f - b, 7f, -29f - b, 2f, 0xFF7CF0FF.toInt()) }
-                else { G.circle(c, -5f + lx * 2.5f, -30f - b + ly, 3.5f, 0xFF7CF0FF.toInt(), false); G.circle(c, 5f + lx * 2.5f, -30f - b + ly, 3.5f, 0xFF7CF0FF.toInt(), false) }
+                if (!G.noFace) { G.rrect(c, -13f, -38f - b, 11f, -21f - b, 5f, 0xFF1E2A3A.toInt()) }
+                if (!G.noFace) { if (bl) { G.line(c, -8f, -29f - b, -3f, -29f - b, 2f, 0xFF7CF0FF.toInt()); G.line(c, 2f, -29f - b, 7f, -29f - b, 2f, 0xFF7CF0FF.toInt()) } else { G.circle(c, -5f + lx * 2.5f, -30f - b + ly, 3.5f, 0xFF7CF0FF.toInt(), false); G.circle(c, 5f + lx * 2.5f, -30f - b + ly, 3.5f, 0xFF7CF0FF.toInt(), false) } }
                 G.circle(c, -15f, -42f - b, 2.5f, 0xAAFFFFFF.toInt(), false)
             }
             12 -> { // bean

@@ -10,7 +10,7 @@ import com.starguys.battle.core.len
 import com.starguys.battle.core.rf
 import com.starguys.battle.core.sinf
 import kotlin.math.abs
-import kotlin.math.atan2
+import com.starguys.battle.core.atan2
 
 /** Projectile visual styles */
 object PV {
@@ -212,6 +212,7 @@ class Projectile(val m: Match) {
 
     fun draw(c: Canvas) {
         val sy = y - z * ZS
+        if (vis != PV.CONFETTI && vis != PV.SHELL && vis != PV.TRASH && vis != PV.ROCK) G.glow(c, x, sy, r * (if (vis == PV.FLAME) 2.2f else 2.8f), G.alpha(color, 0.55f))
         G.ow = 2f
         val a = atan2(vy, vx)
         when (vis) {

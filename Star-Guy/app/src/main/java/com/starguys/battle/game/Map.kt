@@ -2,6 +2,10 @@ package com.starguys.battle.game
 
 import android.graphics.Canvas
 import com.starguys.battle.core.G
+import com.starguys.battle.core.TW
+import android.graphics.Bitmap
+import android.graphics.Paint
+import android.graphics.RectF
 import com.starguys.battle.core.clamp
 import com.starguys.battle.core.floorInt
 import com.starguys.battle.core.sinf
@@ -37,27 +41,87 @@ enum class Biome(
     val label: String, val floorA: Int, val floorB: Int, val wallTop: Int, val wallSide: Int,
     val cliff: Int, val bgTop: Int, val bgBottom: Int, val bush: Int, val accent: Int, val desc: String
 ) {
-    MEADOW("Prairie étoilée", 0xFF8FD86E.toInt(), 0xFF82CD62.toInt(), 0xFF5DB665.toInt(), 0xFF2F7D43.toInt(),
-        0xFF9C6B44.toInt(), 0xFF6BB8F0.toInt(), 0xFF2C5FB8.toInt(), 0xFF3E9B47.toInt(), 0xFFFFD23F.toInt(), "L'arène classique"),
-    PARK("Parc d'attractions", 0xFFF4DCAE.toInt(), 0xFFEBCD97.toInt(), 0xFFEF6A82.toInt(), 0xFFB33952.toInt(),
-        0xFF9B6A4C.toInt(), 0xFFB070E8.toInt(), 0xFF4A1F7A.toInt(), 0xFF4CB86B.toInt(), 0xFFFFD23F.toInt(), "Grande roue, montagnes russes, autos-tamponneuses"),
-    FACTORY("Usine à jouets", 0xFFBAC4D8.toInt(), 0xFFAEB9CE.toInt(), 0xFFFFC23D.toInt(), 0xFFC48A12.toInt(),
-        0xFF5C6378.toInt(), 0xFF3B3F5C.toInt(), 0xFF1D1F33.toInt(), 0xFF57B86B.toInt(), 0xFF35C6F4.toInt(), "Tapis roulants, presses, cuves de peinture"),
-    SNOW("Montagne enneigée", 0xFFF3F8FF.toInt(), 0xFFE5EDF9.toInt(), 0xFF9DC2E4.toInt(), 0xFF5E86B0.toInt(),
-        0xFF7D93B5.toInt(), 0xFFBFD9F2.toInt(), 0xFF6C8EC0.toInt(), 0xFF2F8C5A.toInt(), 0xFF6BD3FF.toInt(), "Sol glissant, avalanches, chalets"),
-    BEACH("Plage tropicale", 0xFFF8E2A4.toInt(), 0xFFF1D58E.toInt(), 0xFFB9A58E.toInt(), 0xFF7F6C58.toInt(),
-        0xFFC9A66B.toInt(), 0xFF45C3EA.toInt(), 0xFF1A7FB8.toInt(), 0xFF3DAE5A.toInt(), 0xFFFF8C42.toInt(), "Bateaux, cocotiers, crabes géants"),
-    KITCHEN("Cuisine géante", 0xFFFFFBF2.toInt(), 0xFFF5A3A3.toInt(), 0xFFDCE3EA.toInt(), 0xFF9AA7B4.toInt(),
-        0xFFB8875A.toInt(), 0xFFF3E1C2.toInt(), 0xFFC9A77B.toInt(), 0xFF7BC86B.toInt(), 0xFFFF6B6B.toInt(), "On est minuscule : assiettes, fourchettes, casseroles"),
-    SPACE("Station spatiale", 0xFFCBD1E2.toInt(), 0xFFBCC3D7.toInt(), 0xFF7383B3.toInt(), 0xFF4A5480.toInt(),
-        0xFF39405E.toInt(), 0xFF0B0B24.toInt(), 0xFF1E1046.toInt(), 0xFF59C98A.toInt(), 0xFF7CF0FF.toInt(), "Faible gravité"),
-    VOLCANO("Volcan jelly", 0xFF9A6352.toInt(), 0xFF8F5A48.toInt(), 0xFF65404E.toInt(), 0xFF3A2430.toInt(),
-        0xFF4A2A30.toInt(), 0xFF4A1530.toInt(), 0xFF1A0610.toInt(), 0xFF6E9E4A.toInt(), 0xFFFF5E7E.toInt(), "Lave en gélatine"),
-    SWAMP("Marais hanté", 0xFF66804F.toInt(), 0xFF5D774A.toInt(), 0xFF4A5A46.toInt(), 0xFF263022.toInt(),
-        0xFF3B3326.toInt(), 0xFF1D2B22.toInt(), 0xFF0A120D.toInt(), 0xFF2F6B3A.toInt(), 0xFFFFC94D.toInt(), "Brouillard et lanternes");
+    MEADOW("Prairie étoilée", TW.LIME_400, TW.LIME_500, TW.EMERALD_400, TW.EMERALD_700,
+        TW.AMBER_700, TW.SKY_400, TW.BLUE_700, TW.GREEN_500, TW.YELLOW_400, "L'arène classique"),
+    PARK("Parc d'attractions", TW.AMBER_100, TW.AMBER_200, TW.ROSE_400, TW.ROSE_700,
+        TW.AMBER_800, TW.FUCHSIA_400, TW.VIOLET_800, TW.EMERALD_500, TW.YELLOW_400, "Grande roue, montagnes russes, autos-tamponneuses"),
+    FACTORY("Usine à jouets", TW.SKY_200, TW.SLATE_300, TW.AMBER_400, TW.AMBER_700,
+        TW.SLATE_600, TW.SLATE_700, TW.SLATE_900, TW.EMERALD_500, TW.CYAN_400, "Tapis roulants, presses, cuves de peinture"),
+    SNOW("Montagne enneigée", TW.SLATE_50, TW.SKY_100, TW.SKY_300, TW.SKY_700,
+        TW.SLATE_400, TW.SKY_200, TW.BLUE_500, TW.EMERALD_600, TW.CYAN_300, "Sol glissant, avalanches, chalets"),
+    BEACH("Plage tropicale", TW.AMBER_200, TW.YELLOW_200, TW.STONE_400, TW.STONE_600,
+        TW.AMBER_700, TW.CYAN_400, TW.SKY_700, TW.GREEN_500, TW.ORANGE_400, "Bateaux, cocotiers, crabes géants"),
+    KITCHEN("Cuisine géante", TW.WHITE, TW.RED_300, TW.SLATE_200, TW.SLATE_500,
+        TW.AMBER_700, TW.ORANGE_200, TW.AMBER_600, TW.LIME_500, TW.RED_400, "On est minuscule : assiettes, fourchettes, casseroles"),
+    SPACE("Station spatiale", TW.SLATE_300, TW.INDIGO_300, TW.INDIGO_500, TW.INDIGO_800,
+        TW.SLATE_700, TW.INDIGO_950, TW.SLATE_950, TW.TEAL_400, TW.CYAN_300, "Faible gravité"),
+    VOLCANO("Volcan jelly", TW.STONE_600, TW.STONE_700, TW.PURPLE_700, TW.PURPLE_900,
+        TW.STONE_700, TW.ROSE_700, TW.PURPLE_950, TW.LIME_600, TW.PINK_500, "Lave en gélatine"),
+    SWAMP("Marais hanté", TW.GREEN_700, TW.GREEN_800, TW.TEAL_800, TW.EMERALD_900,
+        TW.STONE_700, TW.EMERALD_900, TW.SLATE_950, TW.GREEN_600, TW.AMBER_400, "Brouillard et lanternes");
 
     val lowGravity get() = this == SPACE
     val fog get() = this == SWAMP
+}
+
+/** Procedurally painted ground textures (one pair per biome), drawn as bitmaps for detail at low cost. */
+object TileArt {
+    private val cache = HashMap<Biome, Array<Bitmap?>>()
+    private val paint = Paint(Paint.FILTER_BITMAP_FLAG or Paint.ANTI_ALIAS_FLAG)
+    private val dst = RectF()
+    private const val S = 96
+
+    fun floor(b: Biome, chk: Boolean): Bitmap? {
+        val arr = cache.getOrPut(b) { arrayOf(make(b, b.floorA, 1), make(b, b.floorB, 2)) }
+        return arr[if (chk) 0 else 1]
+    }
+
+    fun draw(c: Canvas, bmp: Bitmap, l: Float, t: Float, rot: Int) {
+        dst.set(l, t, l + T, t + T)
+        if (rot == 0) { c.drawBitmap(bmp, null, dst, paint); return }
+        c.save(); c.rotate(rot * 90f, l + T / 2, t + T / 2); c.drawBitmap(bmp, null, dst, paint); c.restore()
+    }
+
+    private fun make(b: Biome, base: Int, seed: Int): Bitmap? {
+        val bmp = try { Bitmap.createBitmap(S, S, Bitmap.Config.ARGB_8888) } catch (e: Throwable) { null } ?: return null
+        val c = try { Canvas(bmp) } catch (e: Throwable) { return null }
+        val r = java.util.Random(b.ordinal * 31L + seed)
+        val oF = G.flash; val oA = G.fade; val oD = G.depth; val oW = G.ow
+        G.flash = 0f; G.fade = 1f; G.depth = false
+        G.rect(c, 0f, 0f, S.toFloat(), S.toFloat(), base, false)
+        fun rf(a: Float, z: Float) = a + r.nextFloat() * (z - a)
+        // fine noise
+        for (i in 0 until 70) G.circle(c, rf(0f, 96f), rf(0f, 96f), rf(0.8f, 2.4f), G.alpha(if (r.nextBoolean()) TW.WHITE else TW.BLACK, rf(0.04f, 0.10f)), false)
+        when (b) {
+            Biome.MEADOW, Biome.SWAMP -> {
+                for (i in 0 until 16) { val x = rf(4f, 92f); val y = rf(8f, 92f); val h = rf(6f, 12f); val lean = rf(-3f, 3f)
+                    G.line(c, x, y, x + lean, y - h, 2.2f, G.shade(base, rf(0.68f, 0.82f))); G.line(c, x + 3, y, x + 3 + lean, y - h * 0.8f, 2f, G.light(base, 0.25f)) }
+                if (b == Biome.MEADOW && seed == 1) for (i in 0 until 3) { val x = rf(10f, 86f); val y = rf(10f, 86f); G.circle(c, x, y, 2.6f, if (i % 2 == 0) TW.PINK_300 else TW.YELLOW_300, false); G.circle(c, x, y, 1f, TW.WHITE, false) }
+                if (b == Biome.SWAMP) for (i in 0 until 4) G.oval(c, rf(10f, 86f), rf(10f, 86f), rf(5f, 10f), rf(3f, 6f), G.alpha(TW.EMERALD_900, 0.35f), false)
+            }
+            Biome.PARK -> { for (row in 0 until 3) { val y = row * 32f; G.line(c, 0f, y, 96f, y, 2.5f, G.alpha(TW.AMBER_700, 0.25f)); val off = if (row % 2 == 0) 0f else 24f
+                    for (k in 0..2) G.line(c, off + k * 48f, y, off + k * 48f, y + 32f, 2.5f, G.alpha(TW.AMBER_700, 0.25f)) } }
+            Biome.FACTORY, Biome.SPACE -> {
+                G.rect(c, 6f, 6f, 90f, 90f, 0, false)
+                G.stroke.strokeWidth = 2.5f; G.stroke.color = G.alpha(TW.SLATE_700, 0.28f); c.drawRect(5f, 5f, 91f, 91f, G.stroke)
+                for (p in arrayOf(floatArrayOf(12f, 12f), floatArrayOf(84f, 12f), floatArrayOf(12f, 84f), floatArrayOf(84f, 84f))) { G.circle(c, p[0], p[1], 3.2f, G.shade(base, 0.7f), false); G.circle(c, p[0] - 1f, p[1] - 1f, 1.4f, TW.WHITE, false) }
+                if (b == Biome.SPACE) G.rect(c, 20f, 44f, 76f, 52f, G.alpha(TW.CYAN_300, 0.35f), false)
+                else for (k in 0 until 5) G.line(c, 16f, 24f + k * 12f, 80f, 24f + k * 12f, 1.5f, G.alpha(TW.WHITE, 0.15f))
+            }
+            Biome.SNOW -> { for (i in 0 until 14) G.star(c, rf(4f, 92f), rf(4f, 92f), rf(1.5f, 3f), 0.8f, 4, 0f, G.alpha(TW.WHITE, 0.9f), false)
+                for (i in 0 until 3) G.oval(c, rf(10f, 86f), rf(10f, 86f), rf(12f, 20f), rf(5f, 8f), G.alpha(TW.SKY_300, 0.18f), false) }
+            Biome.BEACH -> { for (i in 0 until 40) G.circle(c, rf(0f, 96f), rf(0f, 96f), rf(0.8f, 1.8f), G.alpha(TW.AMBER_600, 0.35f), false)
+                for (k in 0 until 2) { G.arc(c, rf(20f, 76f), rf(20f, 76f), rf(14f, 22f), 200f, 140f, 2f, G.alpha(TW.AMBER_500, 0.35f)) } }
+            Biome.KITCHEN -> { for (k in 0 until 8) { G.line(c, k * 12f, 0f, k * 12f, 96f, 1.2f, G.alpha(TW.BLACK, 0.06f)); G.line(c, 0f, k * 12f, 96f, k * 12f, 1.2f, G.alpha(TW.BLACK, 0.06f)) } }
+            Biome.VOLCANO -> { for (k in 0 until 3) { var x = rf(10f, 86f); var y = rf(10f, 86f); for (j in 0 until 4) { val nx = x + rf(-16f, 16f); val ny = y + rf(-16f, 16f); G.line(c, x, y, nx, ny, 2f, G.alpha(TW.BLACK, 0.35f)); x = nx; y = ny } }
+                for (i in 0 until 5) G.circle(c, rf(6f, 90f), rf(6f, 90f), rf(1.5f, 2.5f), G.alpha(TW.PINK_400, 0.7f), false) }
+        }
+        // bevel: light top-left, dark bottom-right
+        G.line(c, 1f, 1f, 95f, 1f, 3f, G.alpha(TW.WHITE, 0.22f)); G.line(c, 1f, 1f, 1f, 95f, 3f, G.alpha(TW.WHITE, 0.16f))
+        G.line(c, 1f, 95f, 95f, 95f, 3f, G.alpha(TW.BLACK, 0.14f)); G.line(c, 95f, 1f, 95f, 95f, 3f, G.alpha(TW.BLACK, 0.10f))
+        G.flash = oF; G.fade = oA; G.depth = oD; G.ow = oW
+        return bmp
+    }
 }
 
 class TileMap(val w: Int, val h: Int, var biome: Biome) {
@@ -207,15 +271,15 @@ class TileMap(val w: Int, val h: Int, var biome: Biome) {
         val chk = (tx + ty) and 1 == 0
         return when (tp) {
             Tl.WALL -> b.wallTop
-            Tl.BOX -> 0xFFD9A066.toInt()
-            Tl.GLASS -> 0xAACDEBFF.toInt()
-            Tl.LOW -> 0xFFC28A4E.toInt()
-            Tl.FOAM -> 0xFFF4F7FF.toInt()
-            Tl.BRICK -> 0xFFE07B4A.toInt()
-            Tl.DOOR -> 0xFF8A93A8.toInt()
-            Tl.ICE -> if (chk) 0xFFCFEFFF.toInt() else 0xFFC2E8FB.toInt()
-            Tl.WATER -> 0xFF4FB5F0.toInt()
-            Tl.LAVA -> 0xFFFF5E7E.toInt()
+            Tl.BOX -> TW.AMBER_300
+            Tl.GLASS -> 0xAABAE6FD.toInt()
+            Tl.LOW -> TW.AMBER_600
+            Tl.FOAM -> TW.SLATE_50
+            Tl.BRICK -> TW.ORANGE_500
+            Tl.DOOR -> TW.SLATE_400
+            Tl.ICE -> if (chk) TW.SKY_100 else TW.SKY_200
+            Tl.WATER -> TW.SKY_400
+            Tl.LAVA -> TW.PINK_500
             Tl.PAINT -> paintColor
             Tl.CONVEYOR -> 0xFF4A4F63.toInt()
             Tl.GOAL -> if (chk) 0xFFFFFFFF.toInt() else 0xFF26213A.toInt()
@@ -244,7 +308,10 @@ class TileMap(val w: Int, val h: Int, var biome: Biome) {
                 drawCliffBelow(c, tx, ty, 0f)
                 continue
             }
-            G.rect(c, l, tp0, l + T, tp0 + T, topColor(tp, tx, ty), false)
+            val chk = (tx + ty) and 1 == 0
+            val tex = if (tp == Tl.FLOOR || tp == Tl.BUSH || tp == Tl.RAIL || tp == Tl.LADDER) TileArt.floor(biome, chk) else null
+            if (tex != null) TileArt.draw(c, tex, l, tp0, (tx * 7 + ty * 13) and 3)
+            else G.rect(c, l, tp0, l + T, tp0 + T, topColor(tp, tx, ty), false)
             when (tp) {
                 Tl.WATER -> {
                     val o = sinf(time * 2f + tx * 0.7f + ty * 0.5f) * 6f
@@ -291,6 +358,20 @@ class TileMap(val w: Int, val h: Int, var biome: Biome) {
         }
     }
 
+    /** Soft drop shadows cast by raised blocks onto the ground (light from the top-left). */
+    fun drawShadows(c: Canvas, x0: Int, y0: Int, x1: Int, y1: Int) {
+        G.fill.shader = null
+        for (ty in y0..y1) for (tx in x0..x1) {
+            if (!isRaised(tx, ty)) continue
+            val hgt = groundZ(tx, ty)
+            if (hgt <= 0f) continue
+            val off = minOf(34f, 6f + hgt * 0.32f)
+            val l = tx * T + off; val t0 = ty * T + off * 0.55f - hgt * ZS * 0.15f
+            G.fill.color = 0x2E0F172A
+            c.drawRect(l, t0, l + T, t0 + T, G.fill)
+        }
+    }
+
     private fun drawCliffBelow(c: Canvas, tx: Int, ty: Int, top: Float) {
         val below = t(tx, ty + 1)
         val belowVoid = below == Tl.VOID || (below == Tl.COLLAPSE && aux(tx, ty + 1) == 1)
@@ -328,12 +409,12 @@ class TileMap(val w: Int, val h: Int, var biome: Biome) {
             G.ow = 2.5f
             val side = when (tp) {
                 Tl.WALL -> biome.wallSide
-                Tl.BOX -> 0xFFA8733F.toInt()
-                Tl.GLASS -> 0x887FB8E0.toInt()
-                Tl.LOW -> 0xFF8E5C2E.toInt()
-                Tl.FOAM -> 0xFFC9D2E8.toInt()
-                Tl.BRICK -> 0xFFA9502C.toInt()
-                Tl.DOOR -> 0xFF5D6478.toInt()
+                Tl.BOX -> TW.AMBER_600
+                Tl.GLASS -> 0x887DD3FC.toInt()
+                Tl.LOW -> TW.AMBER_800
+                Tl.FOAM -> TW.SLATE_300
+                Tl.BRICK -> TW.ORANGE_700
+                Tl.DOOR -> TW.SLATE_600
                 else -> biome.cliff
             }
             if (frontBottom > frontTop + 0.5f) {

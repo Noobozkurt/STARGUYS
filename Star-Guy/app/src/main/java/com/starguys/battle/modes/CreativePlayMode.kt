@@ -61,9 +61,11 @@ class CreativePlayMode(m: Match) : GameMode(m) {
                 }
             }
             val p = m.player
-            if (p != null && p.finished) { m.finish(p.place <= 3, if (p.place == 1) "Victoire !" else "Arrivé #${p.place}"); return }
-            if (order >= 3) { m.finish(false, "Le podium est complet !"); return }
-            if (tickTimer(dt)) m.finish(false, "Temps écoulé !")
+            val humansLeft = m.fighters.any { it.human && !it.finished }
+            if (order >= 3 || !humansLeft || tickTimer(dt)) {
+                val title = when { p == null || !p.finished -> if (order >= 3) "Le podium est complet !" else "Temps écoulé !"; p.place == 1 -> "Victoire !"; else -> "Arrivé #${p.place}" }
+                m.finish(p != null && p.finished && p.place <= 3, title)
+            }
         } else {
             val lead = m.fighters.maxByOrNull { it.kills }
             if (lead != null && lead.kills >= 10) { m.finish(lead === m.player, "${lead.name} gagne !"); return }

@@ -89,14 +89,17 @@ class SimTest {
         val app = app()
         val c = Canvas()
         val screens = listOf(MainMenu(app), ModeSelect(app), LobbyScreen(app, Modes.HUNTER), LobbyScreen(app, Modes.ZEROG), HeroSelect(app) { MainMenu(app) },
-            SettingsScreen(app), EditorMenu(app), EditorScreen(app, 0))
+            SettingsScreen(app), EditorMenu(app), EditorScreen(app, 0),
+            com.starguys.battle.ui.MultiMenu(app), com.starguys.battle.ui.HostLobby(app, com.starguys.battle.net.Net.WIFI), com.starguys.battle.ui.JoinScreen(app, com.starguys.battle.net.Net.WIFI))
         for (s in screens) {
             s.layout(); s.enter()
             for (k in 0 until 30) { s.update(1f / 60f); s.draw(c) }
             s.touch(TouchEvt(TouchEvt.DOWN, 0, 960f, 540f)); s.touch(TouchEvt(TouchEvt.MOVE, 0, 980f, 560f)); s.touch(TouchEvt(TouchEvt.UP, 0, 980f, 560f))
-            for (b in ArrayList(s.btns)) { if (b.label.contains("JOUER") || b.label.contains("▶") || b.label == "Importer un code" || b.label.contains("Partager") || b.label == "CHOISIR") continue; try { b.onClick() } catch (e: Throwable) { throw AssertionError("button ${b.label} in ${s.javaClass.simpleName}", e) } }
+            for (b in ArrayList(s.btns)) { if (b.label.contains("JOUER") || b.label.contains("LANCER") || b.label.contains("Rejoindre") || b.label.contains("Créer") || b.label.contains("visible") || b.label.contains("▶") || b.label == "Importer un code" || b.label.contains("Partager") || b.label == "CHOISIR") continue; try { b.onClick() } catch (e: Throwable) { throw AssertionError("button ${b.label} in ${s.javaClass.simpleName}", e) } }
             s.draw(c)
+            s.leave()
         }
+        com.starguys.battle.net.Net.leave()
         assertTrue(true)
     }
 }

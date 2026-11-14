@@ -149,7 +149,7 @@ open class Body(val m: Match) {
     fun shadow(c: Canvas, r: Float = radius) {
         if (gz <= VOID_Z + 1) return
         val h = clamp((z - gz) / 300f, 0f, 0.6f)
-        G.oval(c, x, y - gz * ZS + 2f, r * (1.05f - h), r * 0.45f * (1.05f - h), 0x44000000, false)
+        G.softShadow(c, x + 3f, y - gz * ZS + 3f, r * (1.35f - h), r * 0.55f * (1.35f - h), 1f - h)
     }
 }
 

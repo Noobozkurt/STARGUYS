@@ -21,12 +21,17 @@ import com.starguys.battle.core.rf
 import com.starguys.battle.core.ri
 import com.starguys.battle.core.sinf
 import kotlin.math.abs
-import kotlin.math.atan2
+import com.starguys.battle.core.atan2
 
 class MatchConfig(
     val mode: Int, val hero: Int, val biome: Biome?, val role: Int = 0,
-    val creative: String? = null, val creativeKind: Int = 0, val seed: Long = System.nanoTime()
-)
+    val creative: String? = null, val creativeKind: Int = 0, val seed: Long = System.nanoTime(),
+    val difficulty: Int = Save.difficulty, val brSize: Int = Save.royaleSize,
+    /** all humans (multiplayer); null in single player */
+    val players: List<NetPlayer>? = null, val localId: Int = 0, val versus: Boolean = false
+) {
+    val net get() = players != null
+}
 
 class Ping(val x: Float, val y: Float, val team: Int, var life: Float = 4f)
 
@@ -82,12 +87,24 @@ class Match(val app: GameApp, val cfg: MatchConfig) {
         cam.m = this
     }
 
+    private val pendingHumans = ArrayList<NetPlayer>()
+    private var hostTeam = 0
+
     fun start() {
+        com.starguys.battle.core.seedSim(cfg.seed)
+        cfg.players?.let { ps -> pendingHumans.addAll(ps.filter { it.id != 0 }.sortedBy { it.id }) }
         mode = com.starguys.battle.modes.Modes.create(cfg.mode, this)
         hud = Hud(this)
         mode.timeLeft = mode.timeLimit
         mode.build()
         if (!::map.isInitialized) map = TileMap(20, 20, biome)
+        // remote humans that no mode slot accepted take over bots
+        for (np in ArrayList(pendingHumans)) {
+            val f = fighters.lastOrNull { !it.human && it.team != TEAM_MOBS } ?: break
+            makeHuman(f, np, f.hero in Heroes.list)
+        }
+        pendingHumans.clear()
+        player = fighters.firstOrNull { it.human && it.netId == cfg.localId } ?: player
         nav = Nav(map)
         map.onDestroyed = { tx, ty, tp -> onTileDestroyed(tx, ty, tp) }
         biome = map.biome
@@ -117,17 +134,42 @@ class Match(val app: GameApp, val cfg: MatchConfig) {
         if (!l.contains(p)) l.add(p)
     }
 
-    fun spawnFighter(hero: HeroDef, name: String, team: Int, human: Boolean, x: Float, y: Float, skin: Int = 0): Fighter {
+    fun spawnFighter(hero: HeroDef, name: String, team: Int, human: Boolean, x: Float, y: Float, skin: Int = 0, netId: Int = -1): Fighter {
         val f = Fighter(this, hero, name, team, human, skin)
+        f.netId = netId
         f.x = x; f.y = y; f.z = maxOf(0f, map.groundAt(x, y)); f.safeX = x; f.safeY = y
         if (!human) f.brain = Bot(f)
         fighters.add(f)
-        if (human) player = f
+        if (human && netId == cfg.localId) player = f
         return f
     }
 
-    fun spawnPlayer(team: Int, x: Float, y: Float, hero: HeroDef = Heroes.byId(cfg.hero)): Fighter =
-        spawnFighter(hero, Save.playerName, team, true, x, y, Save.skin(hero.id))
+    /** The host's fighter (player 0). In single player this is you. */
+    fun spawnPlayer(team: Int, x: Float, y: Float, hero: HeroDef? = null): Fighter {
+        hostTeam = team
+        val np = cfg.players?.firstOrNull { it.id == 0 }
+        return if (np != null) {
+            val h = hero ?: Heroes.byId(np.hero)
+            spawnFighter(h, np.name, team, true, x, y, np.skin, 0)
+        } else {
+            val h = hero ?: Heroes.byId(cfg.hero)
+            spawnFighter(h, Save.playerName, team, true, x, y, Save.skin(h.id), 0)
+        }
+    }
+
+    private fun takeHuman(team: Int): NetPlayer? {
+        if (pendingHumans.isEmpty()) return null
+        val ok = if (cfg.versus) team != hostTeam else (team == hostTeam || team >= 2)
+        return if (ok) pendingHumans.removeAt(0) else null
+    }
+
+    private fun makeHuman(f: Fighter, np: NetPlayer, ownHero: Boolean) {
+        f.human = true; f.netId = np.id; f.brain = null; f.name = np.name
+        f.skin = np.skin
+        if (ownHero) f.setHero(Heroes.byId(np.hero)) else f.color = f.hero.colors[np.skin.coerceIn(0, f.hero.colors.size - 1)]
+        if (np.id == cfg.localId) player = f
+        pendingHumans.remove(np)
+    }
 
     fun spawnBots(n: Int, teamOf: (Int) -> Int, pos: (Int) -> FloatArray, heroPool: List<HeroDef> = Heroes.list): List<Fighter> {
         val out = ArrayList<Fighter>()
@@ -135,9 +177,53 @@ class Match(val app: GameApp, val cfg: MatchConfig) {
         for (i in 0 until n) {
             val p = pos(i)
             val h = heroPool[ri(heroPool.size)]
-            out.add(spawnFighter(h, names[i % names.size], teamOf(i), false, p[0], p[1], ri(3)))
+            val skin = ri(3)
+            val team = teamOf(i)
+            val np = takeHuman(team)
+            if (np != null) {
+                val hh = if (heroPool === Heroes.list) Heroes.byId(np.hero) else h
+                out.add(spawnFighter(hh, np.name, team, true, p[0], p[1], np.skin, np.id))
+            } else out.add(spawnFighter(h, names[i % names.size], team, false, p[0], p[1], skin))
         }
         return out
+    }
+
+    /** A remote player left: a bot takes over their hero (deterministically, on every device). */
+    fun dropPlayer(id: Int) {
+        val f = fighters.firstOrNull { it.human && it.netId == id } ?: return
+        f.human = false; f.brain = Bot(f); f.moveX = 0f; f.moveY = 0f
+        hud.feed("${f.name} a quitté la partie (bot)", 0xFFFFC94D.toInt())
+    }
+
+    /** Applies one human's input. Actions only on the first tick of a turn. */
+    fun applyInput(f: Fighter, inp: PlayerInput, first: Boolean) {
+        if (f.out) { f.moveX = 0f; f.moveY = 0f; return }
+        f.moveX = inp.mx; f.moveY = inp.my
+        if (inp.aiming) { f.face = inp.aim; f.aimT = 0f }
+        if (inp.hold) f.attack(inp.aim, inp.holdDist)
+        if (!first) return
+        for (a in inp.acts) {
+            when (a[0].toInt()) {
+                PlayerInput.ATTACK -> f.attack(a[1], a[2])
+                PlayerInput.SUPER -> f.useSuper(a[1], a[2])
+                PlayerInput.JUMP -> f.jump()
+                PlayerInput.GADGET -> f.useGadget(a[1])
+                PlayerInput.ITEM -> f.useItem()
+                PlayerInput.INTERACT -> interact(f)
+                PlayerInput.PING -> addPing(a[1], a[2], f.team)
+            }
+        }
+    }
+
+    /** Cheap fingerprint of the simulation state, compared between devices to detect desyncs. */
+    fun checksum(): Long {
+        var h = 1469598103934665603L
+        fun mix(v: Int) { h = (h xor v.toLong()) * 1099511628211L }
+        mix(java.lang.Float.floatToIntBits(time))
+        for (f in fighters) { mix(java.lang.Float.floatToIntBits(f.x)); mix(java.lang.Float.floatToIntBits(f.y)); mix(java.lang.Float.floatToIntBits(f.hp)); mix(if (f.out) 1 else 0) }
+        for (mb in mobs) { mix(java.lang.Float.floatToIntBits(mb.x)); mix(java.lang.Float.floatToIntBits(mb.hp)) }
+        mix(projs.size); mix(pickups.size); mix(mobs.size)
+        return h
     }
 
     fun randomSpawn(minDist: Float = 4f * T, area: IntArray? = null): FloatArray {
@@ -303,6 +389,8 @@ class Match(val app: GameApp, val cfg: MatchConfig) {
                 if (dist(x, y, tx * T + T / 2, ty * T + T / 2) < r + T * 0.3f) map.damage(tx, ty, dmg * 0.8f)
             }
         }
+        fx.flash(x, y - 20f, r * 1.4f, color, 0.35f)
+        fx.flash(x, y - 20f, r * 0.7f, 0xFFFFFFFF.toInt(), 0.18f)
         fx.ring(x, y - 10f, r, color, 0.4f)
         fx.ring(x, y - 10f, r * 0.6f, 0xFFFFFFFF.toInt(), 0.3f)
         fx.smoke(x, y - 20f, 8, 0xFFEDE6F5.toInt())
@@ -518,10 +606,10 @@ class Match(val app: GameApp, val cfg: MatchConfig) {
                 when (p.kind) {
                     Pickup.WEAPON -> if (f.modeWeapon == null && (f.weapon == null || f.weapon?.id == p.id)) {
                         f.weapon = Weapons.list[p.id]; f.wAmmo = Weapons.list[p.id].ammo; f.unarmed = false; took = true
-                        if (f.human) hud.toastSmall(Weapons.list[p.id].name)
+                        if (f.isLocal) hud.toastSmall(Weapons.list[p.id].name)
                     }
-                    Pickup.GADGET -> if (f.gadget == null || p.id == Gadgets.PARACHUTE) { giveGadget(f, p.id); took = true; if (f.human) hud.toastSmall(Gadgets.list[p.id].name) }
-                    Pickup.ITEM -> if (f.items.size < 3) { f.items.add(p.id); took = true; if (f.human) hud.toastSmall(Items.list[p.id].name) }
+                    Pickup.GADGET -> if (f.gadget == null || p.id == Gadgets.PARACHUTE) { giveGadget(f, p.id); took = true; if (f.isLocal) hud.toastSmall(Gadgets.list[p.id].name) }
+                    Pickup.ITEM -> if (f.items.size < 3) { f.items.add(p.id); took = true; if (f.isLocal) hud.toastSmall(Items.list[p.id].name) }
                     Pickup.HEAL -> if (f.hp < f.maxHp) { f.heal(1200f); took = true; sound(Sfx.HEAL, f.x, f.y) }
                     Pickup.STAR -> { f.chargeSuper(0.5f); took = true }
                     Pickup.GOLD -> {}
@@ -534,7 +622,7 @@ class Match(val app: GameApp, val cfg: MatchConfig) {
     fun addPing(x: Float, y: Float, team: Int) {
         pings.add(Ping(x, y, team))
         for (f in fighters) if (!f.human && f.team == team) f.brain?.ping(x, y)
-        Sfx.play(Sfx.COUNT, 0.6f, 1.5f)
+        if (player?.team == team) { Sfx.play(Sfx.COUNT, 0.6f, 1.5f); fx.ring(x, y, 60f, 0xFFFBBF24.toInt(), 0.6f) }
     }
 
     fun onFighterDeath(f: Fighter, killer: Fighter?) {
@@ -550,7 +638,7 @@ class Match(val app: GameApp, val cfg: MatchConfig) {
         if (f === player) {
             this.killer = k
             killCamT = if (k != null && k !== f) 1.6f else 0.8f
-            slowMo = 0.35f; slowT = 1.2f
+            if (!cfg.net) { slowMo = 0.35f; slowT = 1.2f }
             Sfx.buzz(120)
             spectate = k?.takeIf { !it.out }
         }
@@ -569,17 +657,35 @@ class Match(val app: GameApp, val cfg: MatchConfig) {
         if (over) return
         over = true; won = playerWon; resultTitle = title
         mode.endT = 3f
-        slowMo = 0.5f; slowT = 1.5f
+        if (!cfg.net) { slowMo = 0.5f; slowT = 1.5f }
         Sfx.play(if (playerWon) Sfx.WIN else Sfx.LOSE)
         player?.emote = if (playerWon) 10f else 0f
         if (playerWon) player?.let { fx.confetti(it.x, it.y - 60f, 60) }
     }
 
     // ------------------------------------------------------------------ update
+    /** Single-player driver: local input + one simulation step + presentation. */
     fun update(rawDt: Float) {
         if (paused) { hud.update(rawDt); return }
         if (slowT > 0) { slowT -= rawDt; if (slowT <= 0f) slowMo = 1f }
         val dt = rawDt * slowMo
+        player?.let { applyInput(it, hud.takeInput(), true) }
+        simStep(dt)
+        frame(rawDt)
+    }
+
+    /** Presentation only (camera, HUD, end-of-match timer). Never touches the simulation. */
+    fun frame(rawDt: Float) {
+        updateCamera(rawDt)
+        hud.update(rawDt)
+        if (over) {
+            mode.endT -= rawDt
+            if (mode.endT <= 0f && !ended) { ended = true; finishCb?.invoke() }
+        }
+    }
+
+    /** One deterministic simulation step (identical on every device in multiplayer). */
+    fun simStep(dt: Float) {
         time += dt
         map.update(dt)
         rebuildLists()
@@ -607,12 +713,6 @@ class Match(val app: GameApp, val cfg: MatchConfig) {
         zones.removeAll { !it.alive }
         vehicles.removeAll { !it.alive }
         if (props.any { !it.alive }) { props.removeAll { !it.alive }; platforms.removeAll { !it.alive } }
-        updateCamera(rawDt)
-        hud.update(rawDt)
-        if (over) {
-            mode.endT -= rawDt
-            if (mode.endT <= 0f && !ended) { ended = true; finishCb?.invoke() }
-        }
     }
 
     private fun rebuildLists() {
@@ -732,11 +832,23 @@ class Match(val app: GameApp, val cfg: MatchConfig) {
         val tx0 = maxOf(0, (vx0 / T).floorInt() - 1); val tx1 = minOf(map.w - 1, (vx1 / T).floorInt() + 1)
         val ty0 = maxOf(0, (vy0 / T).floorInt() - 1); val ty1 = minOf(map.h - 1, (vy1 / T).floorInt() + 5)
         map.drawGround(c, tx0, ty0, tx1, ty1, time)
+        map.drawShadows(c, tx0 - 1, ty0 - 1, tx1, ty1)
         for (zn in zones) zn.drawUnder(c)
         mode.drawUnder(c)
+        val myTeam = player?.team
         for (pg in pings) {
+            if (myTeam != null && pg.team != myTeam) continue
+            val a = clamp(pg.life, 0f, 1f)
+            G.fade = a
             G.ow = 3f
-            G.ring(c, pg.x, pg.y, 30f + (time * 40f % 20f), 4f, G.alpha(0xFFFFE14D.toInt(), pg.life / 4f))
+            G.oval(c, pg.x, pg.y, 40f, 16f, 0x55F59E0B, false)
+            G.rect(c, pg.x - 9f, pg.y - 300f, pg.x + 9f, pg.y, 0x44FDE68A, false)
+            G.ring(c, pg.x, pg.y, 22f + (time * 50f % 34f), 5f, 0xFFFBBF24.toInt())
+            val by = pg.y - 150f + sinf(time * 5f) * 8f
+            G.poly(c, 0xFFF59E0B.toInt(), true, pg.x, by + 34f, pg.x - 16f, by + 8f, pg.x + 16f, by + 8f)
+            G.circle(c, pg.x, by, 24f, 0xFFFBBF24.toInt())
+            G.text(c, "!", pg.x, by + 11f, 32f, G.WHITE)
+            G.fade = 1f
         }
         // sorted entities
         drawList.clear()
@@ -747,6 +859,7 @@ class Match(val app: GameApp, val cfg: MatchConfig) {
         drawList.sortBy { it.sortY }
         var di = 0
         // entities above the first visible row
+        G.depth = true
         while (di < drawList.size && (drawList[di].sortY / T).floorInt() < ty0) { drawList[di].draw(c); di++ }
         for (ty in ty0..ty1) {
             map.drawRaisedRow(c, ty, tx0, tx1, time)
@@ -755,9 +868,10 @@ class Match(val app: GameApp, val cfg: MatchConfig) {
         }
         while (di < drawList.size) { drawList[di].draw(c); di++ }
         for (p in projs) { p.shadow(c) }
-        for (p in projs) p.draw(c)
+        for (p in projs) if (p.x > vx0 - 100f && p.x < vx1 + 100f && p.y > vy0 - 100f && p.y < vy1 + 200f) p.draw(c)
         for (zn in zones) zn.drawOver(c)
         mode.drawOver(c)
+        G.depth = false
         fx.draw(c)
         // storm
         if (stormR > 0f) {
@@ -778,7 +892,22 @@ class Match(val app: GameApp, val cfg: MatchConfig) {
             fogPaint.shader = RadialGradient(fx0, fy0, r * 1.25f, intArrayOf(0x00000000, 0x00000000, 0xE60A120D.toInt()), floatArrayOf(0f, 0.62f, 1f), Shader.TileMode.CLAMP)
             c.drawRect(0f, 0f, w, h, fogPaint)
         }
+        drawVignette(c, w, h)
         hud.draw(c)
+    }
+
+    private val vignettePaint = Paint()
+    private val lightPaint = Paint()
+    private var vigKey = 0f
+    /** Cinematic vignette + warm key light from the top-left: adds depth to the whole frame. */
+    private fun drawVignette(c: Canvas, w: Float, h: Float) {
+        if (vigKey != w * 10000f + h) {
+            vigKey = w * 10000f + h
+            vignettePaint.shader = RadialGradient(w / 2, h / 2, kotlin.math.sqrt(w * w + h * h) * 0.62f, intArrayOf(0x00000000, 0x00000000, 0x660F172A), floatArrayOf(0f, 0.6f, 1f), Shader.TileMode.CLAMP)
+            lightPaint.shader = LinearGradient(0f, 0f, w * 0.6f, h * 0.8f, intArrayOf(0x22FEF3C7, 0x00FEF3C7), null, Shader.TileMode.CLAMP)
+        }
+        c.drawRect(0f, 0f, w, h, lightPaint)
+        c.drawRect(0f, 0f, w, h, vignettePaint)
     }
 
     companion object {

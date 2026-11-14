@@ -22,6 +22,7 @@ class MainActivity : Activity() {
         Save.init(this)
         Sfx.init(this)
         view = GameView(this) { app -> MainMenu(app) }
+        view.app.onFrame = { app -> com.starguys.battle.ui.NetUi.pump(app) }
         setContentView(view)
         immersive()
     }
@@ -51,6 +52,16 @@ class MainActivity : Activity() {
         view.onPauseView()
         Sfx.pauseAll()
         super.onPause()
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        view.app.onPermissionResult(grantResults.isNotEmpty() && grantResults.all { it == android.content.pm.PackageManager.PERMISSION_GRANTED })
+    }
+
+    override fun onDestroy() {
+        com.starguys.battle.net.Net.leave()
+        super.onDestroy()
     }
 
     @Deprecated("Deprecated in Java")

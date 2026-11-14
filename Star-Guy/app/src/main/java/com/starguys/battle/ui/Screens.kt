@@ -9,8 +9,9 @@ import com.starguys.battle.core.Save
 import com.starguys.battle.core.Screen
 import com.starguys.battle.core.Sfx
 import com.starguys.battle.core.TouchEvt
+import com.starguys.battle.core.TW
 import com.starguys.battle.core.cosf
-import com.starguys.battle.core.rf
+import com.starguys.battle.core.frf
 import com.starguys.battle.core.sinf
 import com.starguys.battle.creative.EditorMenu
 import com.starguys.battle.game.Biome
@@ -22,13 +23,46 @@ import com.starguys.battle.game.Match
 import com.starguys.battle.game.MatchConfig
 import com.starguys.battle.modes.Modes
 
-private const val GOLD = 0xFFFFD23F.toInt()
-private const val PURPLE = 0xFF6A3DE8.toInt()
-private const val GREEN = 0xFF7CC243.toInt()
-private const val ORANGE = 0xFFFF9A3D.toInt()
-private const val PINK = 0xFFFF5E7E.toInt()
-private const val BLUE = 0xFF35A0F4.toInt()
-private const val GREY = 0xFF5B4B8A.toInt()
+private const val GOLD = TW.AMBER_400
+private const val PURPLE = TW.VIOLET_600
+private const val GREEN = TW.EMERALD_500
+private const val ORANGE = TW.ORANGE_500
+private const val PINK = TW.PINK_500
+private const val BLUE = TW.SKY_500
+private const val GREY = TW.INDIGO_700
+private const val CYAN = TW.CYAN_500
+
+/** Big title with a vertical gradient fill (bg-clip-text style). */
+fun gradText(c: Canvas, s: String, x: Float, y: Float, size: Float, top: Int, bottom: Int) {
+    G.txtStroke.textSize = size; G.txtStroke.textAlign = Paint.Align.CENTER; G.txtStroke.strokeWidth = size * 0.16f; G.txtStroke.color = TW.INDIGO_950
+    c.drawText(s, x, y + size * 0.06f, G.txtStroke)
+    c.drawText(s, x, y, G.txtStroke)
+    G.txt.textSize = size; G.txt.textAlign = Paint.Align.CENTER
+    G.txt.shader = android.graphics.LinearGradient(0f, y - size, 0f, y, top, bottom, android.graphics.Shader.TileMode.CLAMP)
+    G.txt.color = G.WHITE
+    c.drawText(s, x, y, G.txt)
+    G.txt.shader = null
+}
+
+/** Glowing 3D pedestal for heroes. */
+fun pedestal(c: Canvas, x: Float, y: Float, rx: Float, col: Int, t: Float) {
+    G.glow(c, x, y, rx * 1.5f, G.alpha(col, 0.55f + 0.1f * sinf(t * 2f)))
+    G.ow = rx * 0.025f
+    G.oval(c, x, y + rx * 0.12f, rx, rx * 0.26f, G.shade(col, 0.45f))
+    G.oval(c, x, y, rx, rx * 0.26f, G.mix(col, TW.WHITE, 0.25f))
+    G.oval(c, x, y - rx * 0.02f, rx * 0.8f, rx * 0.19f, G.alpha(TW.WHITE, 0.25f), false)
+}
+
+/** Hero drawn with volumetric shading. */
+fun hero3d(c: Canvas, id: Int, col: Int, x: Float, y: Float, scale: Float, t: Float, moving: Boolean = false, lx: Float = 0.35f, sup: Boolean = false, flipX: Boolean = false) {
+    c.save(); c.translate(x, y); c.scale(if (flipX) -scale else scale, scale)
+    G.softShadow(c, 0f, 2f, 30f, 9f)
+    G.ow = 3f
+    val d = G.depth; G.depth = true
+    HeroArt.draw(c, id, col, t, moving, lx, 0.1f, sup)
+    G.depth = d
+    c.restore()
+}
 
 fun drawCoins(c: Canvas, x: Float, y: Float, u: Float, align: Paint.Align = Paint.Align.LEFT) {
     G.ow = 2.5f * u
@@ -71,9 +105,9 @@ fun drawModeIcon(c: Canvas, id: Int, x: Float, y: Float, s: Float, t: Float) {
     c.restore()
 }
 
-fun panel(c: Canvas, l: Float, t: Float, r: Float, b: Float, u: Float, col: Int = 0xCC2A1F4A.toInt()) {
+fun panel(c: Canvas, l: Float, t: Float, r: Float, b: Float, u: Float, col: Int = TW.SLATE_900) {
     G.ow = 3f * u
-    G.rrect(c, l, t, r, b, 22f * u, col)
+    G.glass(c, l, t, r, b, 24f * u, u, if (col == 0xCC2A1F4A.toInt() || col == TW.SLATE_900) TW.INDIGO_950 else col)
 }
 
 // ============================================================================ main menu
@@ -85,11 +119,12 @@ class MainMenu(app: GameApp) : Screen(app) {
     override fun layout() {
         val u = app.u; val w = app.w; val h = app.h
         btns.clear()
-        btns.add(Btn("JOUER", w - 420f * u, h - 220f * u, 380f * u, 120f * u, ORANGE) { app.go(LobbyScreen(app, Save.lastMode)) }.also { it.sub = Modes.def(Save.lastMode).name; it.textSize = 52f })
-        btns.add(Btn("MODES", w - 420f * u, h - 360f * u, 180f * u, 110f * u, PURPLE) { app.go(ModeSelect(app)) }.also { it.icon = { c, x, y, s -> drawModeIcon(c, 0, x, y, s * 1.2f, t) } })
-        btns.add(Btn("HÉROS", w - 220f * u, h - 360f * u, 180f * u, 110f * u, PINK) { app.go(HeroSelect(app) { MainMenu(app) }) }.also { it.icon = { c, x, y, s -> HeroArt.portrait(c, Save.hero, Heroes.byId(Save.hero).colors[Save.skin(Save.hero)], x, y - s * 0.2f, s * 1.1f, t) } })
-        btns.add(Btn("ATELIER", w - 420f * u, h - 500f * u, 180f * u, 110f * u, GREEN) { app.go(EditorMenu(app)) }.also { it.icon = { c, x, y, s -> drawModeIcon(c, Modes.CREATIVE, x, y, s * 1.2f, t) } })
-        btns.add(Btn("RÉGLAGES", w - 220f * u, h - 500f * u, 180f * u, 110f * u, GREY) { app.go(SettingsScreen(app)) }.also { it.icon = { c, x, y, s -> G.star(c, x, y, s, s * 0.6f, 8, t * 0.5f, 0xFFDDDDEE.toInt()); G.circle(c, x, y, s * 0.35f, GREY) } })
+        btns.add(Btn("JOUER", w - 420f * u, h - 196f * u, 380f * u, 112f * u, ORANGE) { app.go(LobbyScreen(app, Save.lastMode)) }.also { it.sub = Modes.def(Save.lastMode).name; it.textSize = 50f })
+        btns.add(Btn("MODES", w - 420f * u, h - 316f * u, 180f * u, 100f * u, PURPLE) { app.go(ModeSelect(app)) }.also { it.icon = { c, x, y, s -> drawModeIcon(c, 0, x, y, s * 1.2f, t) } })
+        btns.add(Btn("HÉROS", w - 220f * u, h - 316f * u, 180f * u, 100f * u, PINK) { app.go(HeroSelect(app) { MainMenu(app) }) }.also { it.icon = { c, x, y, s -> HeroArt.portrait(c, Save.hero, Heroes.byId(Save.hero).colors[Save.skin(Save.hero)], x, y - s * 0.2f, s * 1.1f, t) } })
+        btns.add(Btn("MULTIJOUEUR", w - 420f * u, h - 436f * u, 180f * u, 100f * u, CYAN) { app.go(MultiMenu(app)) }.also { it.textSize = 22f; it.icon = { c, x, y, s -> wifiIcon(c, x, y, s, t) } })
+        btns.add(Btn("ATELIER", w - 220f * u, h - 436f * u, 180f * u, 100f * u, GREEN) { app.go(EditorMenu(app)) }.also { it.icon = { c, x, y, s -> drawModeIcon(c, Modes.CREATIVE, x, y, s * 1.2f, t) } })
+        btns.add(Btn("RÉGLAGES", w - 420f * u, h - 556f * u, 380f * u, 100f * u, GREY) { app.go(SettingsScreen(app)) }.also { it.icon = { c, x, y, s -> G.star(c, x, y, s, s * 0.6f, 8, t * 0.5f, TW.SLATE_200); G.circle(c, x, y, s * 0.35f, GREY) } })
     }
 
     override fun update(dt: Float) { t += dt }
@@ -97,39 +132,31 @@ class MainMenu(app: GameApp) : Screen(app) {
     override fun draw(c: Canvas) {
         val u = app.u; val w = app.w; val h = app.h
         app.menuBackground(c)
-        // floor
-        G.ow = 3f * u
-        G.oval(c, w * 0.3f, h * 0.84f, 300f * u, 60f * u, 0x55000000, false)
-        G.oval(c, w * 0.3f, h * 0.82f, 270f * u, 50f * u, 0xFF8FD86E.toInt())
         // title
         val ty = 92f * u + sinf(t * 2f) * 4f * u
-        G.text(c, "STAR-GUYS", w * 0.3f, ty, 86f * u, GOLD)
-        G.text(c, "BATTLE", w * 0.3f, ty + 70f * u, 60f * u, 0xFFFF8CC6.toInt())
+        gradText(c, "STAR-GUYS", w * 0.3f, ty, 86f * u, TW.YELLOW_300, TW.ORANGE_500)
+        gradText(c, "BATTLE", w * 0.3f, ty + 70f * u, 60f * u, TW.PINK_300, TW.FUCHSIA_600)
         G.star(c, w * 0.3f - 250f * u, ty - 20f * u, 26f * u, 11f * u, 5, t, GOLD)
-        G.star(c, w * 0.3f + 250f * u, ty - 26f * u, 20f * u, 9f * u, 5, -t, 0xFF6BD3FF.toInt())
-        // selected hero + friends
+        G.star(c, w * 0.3f + 250f * u, ty - 26f * u, 20f * u, 9f * u, 5, -t, TW.CYAN_300)
+        // selected hero + friends on glowing pedestals
         val hid = Save.hero
         val hero = Heroes.byId(hid)
-        c.save(); c.translate(w * 0.3f, h * 0.82f); c.scale(3.6f * u, 3.6f * u)
-        G.ow = 3f
-        HeroArt.draw(c, hid, hero.colors[Save.skin(hid)], t, false, 0.3f + sinf(t) * 0.2f, 0.1f)
-        c.restore()
         for (k in 0 until 2) {
             val oid = (hid + 3 + k * 4) % 12
-            c.save(); c.translate(w * 0.3f + (if (k == 0) -200f else 200f) * u, h * 0.8f); c.scale(2.2f * u * (if (k == 0) 1f else -1f), 2.2f * u)
-            G.fade = 0.9f
-            HeroArt.draw(c, oid, Heroes.byId(oid).colors[0], t + k, false, 0.5f, 0f)
-            G.fade = 1f
-            c.restore()
+            val px = w * 0.3f + (if (k == 0) -215f else 215f) * u
+            pedestal(c, px, h * 0.8f, 80f * u, if (k == 0) TW.SKY_400 else TW.FUCHSIA_400, t + k)
+            hero3d(c, oid, Heroes.byId(oid).colors[0], px, h * 0.8f, 2.2f * u, t + k, lx = 0.5f, flipX = k == 1)
         }
-        G.text(c, hero.name, w * 0.3f, h * 0.95f, 34f * u, G.WHITE)
+        pedestal(c, w * 0.3f, h * 0.84f, 150f * u, TW.AMBER_400, t)
+        hero3d(c, hid, hero.colors[Save.skin(hid)], w * 0.3f, h * 0.84f, 3.6f * u, t, lx = 0.3f + sinf(t) * 0.2f)
+        G.text(c, hero.name, w * 0.3f, h * 0.965f, 34f * u, G.WHITE)
         // profile
         panel(c, w - 430f * u, 24f * u, w - 30f * u, 150f * u, u)
-        G.circle(c, w - 390f * u, 70f * u, 30f * u, PURPLE)
+        G.depth = true; G.circle(c, w - 390f * u, 70f * u, 30f * u, PURPLE); G.depth = false
         G.text(c, "${Save.level()}", w - 390f * u, 81f * u, 30f * u, G.WHITE)
         G.text(c, Save.playerName, w - 345f * u, 64f * u, 26f * u, G.WHITE, Paint.Align.LEFT)
         G.rrect(c, w - 345f * u, 76f * u, w - 60f * u, 92f * u, 8f * u, 0xFF1B1530.toInt())
-        G.rrect(c, w - 345f * u, 76f * u, w - 345f * u + 285f * u * Save.levelProgress(), 92f * u, 8f * u, 0xFF6BD3FF.toInt(), false)
+        G.vgrad(c, w - 345f * u, 76f * u, w - 345f * u + 285f * u * Save.levelProgress().coerceAtLeast(0.04f), 92f * u, 8f * u, TW.CYAN_300, TW.SKY_600)
         drawCoins(c, w - 380f * u, 122f * u, u)
         drawTrophies(c, w - 220f * u, 120f * u, u)
         G.text(c, "Victoires : ${Save.wins}   ·   Parties : ${Save.matches}   ·   K.O. : ${Save.kills}", w - 230f * u, h - 40f * u, 18f * u, 0xCCFFFFFF.toInt())
@@ -263,80 +290,90 @@ class LobbyScreen(app: GameApp, val modeId: Int) : Screen(app) {
     override fun back() { app.go(ModeSelect(app)) }
 }
 
-// ============================================================================ hero select
+// ============================================================================ hero select (3D wheel)
 class HeroSelect(app: GameApp, val backTo: () -> Screen) : Screen(app) {
     private var t = 0f
-    private var sel = Save.hero
+    private val wheel = HeroWheel(Save.hero) { }
+    private val sel get() = wheel.selected
 
     override fun layout() {
         val u = app.u; val w = app.w; val h = app.h
         btns.clear()
+        wheel.layout(w * 0.3f, h * 0.6f, w * 0.25f, h * 0.17f, 52f * u)
         btns.add(Btn("◀", 20f * u, 20f * u, 90f * u, 70f * u, GREY) { app.go(backTo()) })
-        val cols = 4
-        val cw = 132f * u; val ch = 132f * u; val gap = 10f * u
-        for (i in 0 until 12) {
-            val hero = Heroes.list[i]
-            val x = 30f * u + (i % cols) * (cw + gap); val y = 110f * u + (i / cols) * (ch + gap)
-            val b = Btn(hero.name, x, y, cw, ch, 0xFF3A2E6A.toInt()) { sel = i; layout() }
-            b.textSize = 18f
-            b.selected = i == sel
-            b.icon = { c, cx, cy, s -> HeroArt.portrait(c, i, hero.colors[Save.skin(i)], cx, cy + s * 0.15f, s * 1.05f, t) }
-            btns.add(b)
-        }
-        btns.add(Btn("CHOISIR", w - 330f * u, h - 130f * u, 290f * u, 100f * u, ORANGE) { Save.hero = sel; app.go(backTo()) }.also { it.textSize = 40f })
-        // skins
+        btns.add(Btn("‹", 24f * u, h * 0.6f - 40f * u, 66f * u, 80f * u, TW.INDIGO_500) { wheel.step(-1) }.also { it.textSize = 46f })
+        btns.add(Btn("›", w * 0.6f - 90f * u, h * 0.6f - 40f * u, 66f * u, 80f * u, TW.INDIGO_500) { wheel.step(1) }.also { it.textSize = 46f })
+        btns.add(Btn("CHOISIR", w - 330f * u, h - 128f * u, 290f * u, 96f * u, ORANGE) {
+            Save.hero = sel
+            com.starguys.battle.net.Net.session?.setMyHero(sel, Save.skin(sel))
+            app.go(backTo())
+        }.also { it.textSize = 40f })
+        layoutSkins()
+    }
+
+    private var skinFor = -1
+    private fun layoutSkins() {
+        val u = app.u; val w = app.w; val h = app.h
+        btns.removeAll { it.label == "skin" || it.label == "100" || it.label == " " }
         val hero = Heroes.list[sel]
         for (s in 0 until hero.colors.size) {
             val owned = Save.skinOwned(sel, s)
-            val b = Btn(if (owned) "" else "100", w * 0.62f + s * 92f * u, h - 130f * u, 80f * u, 80f * u, hero.colors[s]) {
-                if (Save.skinOwned(sel, s)) { Save.setSkin(sel, s); layout() }
-                else if (Save.coins >= 100) { Save.coins -= 100; Save.buySkin(sel, s); Save.setSkin(sel, s); Sfx.play(Sfx.COIN); layout() }
+            val b = Btn(if (owned) " " else "100", w * 0.62f + s * 92f * u, h - 128f * u, 80f * u, 80f * u, hero.colors[s]) {
+                if (Save.skinOwned(sel, s)) { Save.setSkin(sel, s); layoutSkins() }
+                else if (Save.coins >= 100) { Save.coins -= 100; Save.buySkin(sel, s); Save.setSkin(sel, s); Sfx.play(Sfx.COIN); layoutSkins() }
                 else app.toast("Pas assez de pièces !")
             }
             b.selected = Save.skin(sel) == s
             if (!owned) b.icon = { c, cx, cy, sz -> G.circle(c, cx, cy - sz * 0.3f, sz * 0.5f, GOLD) }
             btns.add(b)
         }
+        skinFor = sel
     }
 
-    override fun update(dt: Float) { t += dt }
+    override fun touch(e: TouchEvt) {
+        if (handleButtons(e)) return
+        wheel.touch(e)
+    }
+
+    override fun update(dt: Float) {
+        t += dt
+        wheel.update(dt)
+        if (skinFor != sel && !wheel.moving) layoutSkins()
+    }
 
     override fun draw(c: Canvas) {
         val u = app.u; val w = app.w; val h = app.h
-        app.menuBackground(c, 0xFF3A1F6A.toInt(), 0xFFFF5E9E.toInt())
-        G.text(c, "HÉROS", 310f * u, 70f * u, 46f * u, G.WHITE)
-        drawButtons(c)
+        app.menuBackground(c, TW.VIOLET_800, TW.PINK_500)
+        gradText(c, "HÉROS", w * 0.3f, 76f * u, 50f * u, TW.YELLOW_200, TW.AMBER_500)
+        G.text(c, "Fais tourner la roue", w * 0.3f, 112f * u, 20f * u, TW.PINK_200)
+        wheel.draw(c, t, app.u)
         val hero = Heroes.list[sel]
-        val px = w * 0.54f
-        panel(c, px, 30f * u, w - 30f * u, h - 160f * u, u)
-        // big preview
-        c.save(); c.translate(px + 130f * u, 330f * u); c.scale(3.3f * u, 3.3f * u)
-        G.ow = 3f
-        HeroArt.draw(c, sel, hero.colors[Save.skin(sel)], t, (t % 4f) > 2f, 0.4f + sinf(t * 1.3f) * 0.3f, 0.1f, superOn = (t % 6f) > 5f)
-        c.restore()
-        val tx = px + 260f * u
-        G.text(c, hero.name, tx, 90f * u, 40f * u, G.WHITE, Paint.Align.LEFT)
-        G.text(c, "${hero.cls} · ${hero.look}", tx, 122f * u, 19f * u, 0xFFFFF3B0.toInt(), Paint.Align.LEFT)
-        stat(c, tx, 160f * u, "Vie", hero.hp / 6000f, "${hero.hp.toInt()}", 0xFF7CFF8A.toInt())
-        stat(c, tx, 196f * u, "Vitesse", (hero.speed - 200f) / 80f, "${hero.speed.toInt()}", 0xFF6BD3FF.toInt())
+        val px = w * 0.62f
+        panel(c, px - 20f * u, 30f * u, w - 30f * u, h - 160f * u, u)
+        val tx = px + 10f * u
+        gradText(c, hero.name, tx + G.textW(hero.name, 44f * u) / 2, 90f * u, 44f * u, TW.WHITE, TW.SKY_200)
+        G.text(c, "${hero.cls} · ${hero.look}", tx, 124f * u, 19f * u, TW.AMBER_200, Paint.Align.LEFT)
+        stat(c, tx, 162f * u, "Vie", hero.hp / 6000f, "${hero.hp.toInt()}", TW.EMERALD_400, TW.EMERALD_600)
+        stat(c, tx, 198f * u, "Vitesse", (hero.speed - 200f) / 80f, "${hero.speed.toInt()}", TW.SKY_300, TW.SKY_600)
         val tw = w - 60f * u - tx
-        var y = 250f * u
-        G.text(c, "Attaque : ${hero.attack.name}", tx, y, 22f * u, ORANGE, Paint.Align.LEFT); y += 26f * u
+        var y = 252f * u
+        G.text(c, "Attaque : ${hero.attack.name}", tx, y, 22f * u, TW.ORANGE_300, Paint.Align.LEFT); y += 26f * u
         for (l in G.wrap(hero.attack.desc, 18f * u, tw)) { G.text(c, l, tx, y, 18f * u, G.WHITE, Paint.Align.LEFT); y += 22f * u }
         y += 10f * u
-        G.text(c, "Super : ${hero.superName}", tx, y, 22f * u, GOLD, Paint.Align.LEFT); y += 26f * u
+        G.text(c, "Super : ${hero.superName}", tx, y, 22f * u, TW.YELLOW_300, Paint.Align.LEFT); y += 26f * u
         for (l in G.wrap(hero.superDesc, 18f * u, tw)) { G.text(c, l, tx, y, 18f * u, G.WHITE, Paint.Align.LEFT); y += 22f * u }
         y += 14f * u
-        G.text(c, "Trophées : ${Save.heroTrophies(sel)}", tx, y, 20f * u, 0xFFFFE14D.toInt(), Paint.Align.LEFT)
-        G.text(c, "Couleurs", w * 0.62f, h - 142f * u, 20f * u, 0xFFFFF3B0.toInt(), Paint.Align.LEFT)
-        drawCoins(c, w - 260f * u, 60f * u + 0f, u)
+        G.text(c, "Trophées : ${Save.heroTrophies(sel)}", tx, y, 20f * u, TW.AMBER_300, Paint.Align.LEFT)
+        G.text(c, "Couleurs", w * 0.62f, h - 140f * u, 20f * u, TW.AMBER_200, Paint.Align.LEFT)
+        drawButtons(c)
+        drawCoins(c, w - 200f * u, h - 175f * u, u)
     }
 
-    private fun stat(c: Canvas, x: Float, y: Float, name: String, frac: Float, v: String, col: Int) {
+    private fun stat(c: Canvas, x: Float, y: Float, name: String, frac: Float, v: String, c1: Int, c2: Int) {
         val u = app.u
         G.text(c, name, x, y + 8f * u, 18f * u, G.WHITE, Paint.Align.LEFT)
-        G.rrect(c, x + 90f * u, y - 6f * u, x + 290f * u, y + 12f * u, 8f * u, 0xFF1B1530.toInt())
-        G.rrect(c, x + 90f * u, y - 6f * u, x + 90f * u + 200f * u * frac.coerceIn(0.08f, 1f), y + 12f * u, 8f * u, col, false)
+        G.rrect(c, x + 90f * u, y - 6f * u, x + 290f * u, y + 12f * u, 8f * u, TW.SLATE_900, false)
+        G.vgrad(c, x + 90f * u, y - 6f * u, x + 90f * u + 200f * u * frac.coerceIn(0.08f, 1f), y + 12f * u, 8f * u, c1, c2)
         G.text(c, v, x + 300f * u, y + 9f * u, 18f * u, G.WHITE, Paint.Align.LEFT)
     }
 
@@ -382,12 +419,19 @@ class GameScreen(app: GameApp, val cfg: MatchConfig) : Screen(app) {
     lateinit var match: Match
     private var ready = false
     private var error: String? = null
+    private var lock: com.starguys.battle.net.Lockstep? = null
 
     override fun enter() {
         try {
             match = Match(app, cfg)
             match.finishCb = { app.go(ResultScreen(app, match)) }
             match.start()
+            if (cfg.net) {
+                val s = com.starguys.battle.net.Net.session
+                if (s == null || s.closed) { error = "Connexion perdue"; return }
+                lock = com.starguys.battle.net.Lockstep(match, s)
+                match.hud.quitCb = { com.starguys.battle.net.Net.leave(); app.go(MainMenu(app)) }
+            }
             ready = true
         } catch (e: Throwable) {
             e.printStackTrace()
@@ -395,17 +439,36 @@ class GameScreen(app: GameApp, val cfg: MatchConfig) : Screen(app) {
         }
     }
 
-    override fun update(dt: Float) { if (ready) match.update(dt) }
+    override fun update(dt: Float) {
+        if (!ready) return
+        val l = lock
+        if (l != null) l.update(dt) else match.update(dt)
+    }
 
     override fun draw(c: Canvas) {
-        if (ready) { match.draw(c); return }
+        if (ready) {
+            match.draw(c)
+            val l = lock
+            if (l != null) {
+                val u = app.u
+                if (l.stallT > 0.6f) {
+                    G.glass(c, app.w / 2 - 260f * u, app.h * 0.42f - 40f * u, app.w / 2 + 260f * u, app.h * 0.42f + 26f * u, 22f * u, u)
+                    G.text(c, "En attente des autres joueurs…", app.w / 2, app.h * 0.42f + 6f * u, 26f * u, TW.AMBER_200)
+                }
+                if (com.starguys.battle.net.Net.session?.desync == true) G.text(c, "⚠ désynchronisation", 120f * u, app.h - 70f * u, 16f * u, TW.ORANGE_300)
+            }
+            return
+        }
         app.menuBackground(c)
         G.text(c, if (error != null) "Erreur : $error" else "Chargement…", app.w / 2, app.h / 2, 26f * app.u, G.WHITE)
     }
 
     override fun touch(e: TouchEvt) { if (ready) match.hud.touch(e) else if (error != null && e.action == TouchEvt.UP) app.go(MainMenu(app)) }
-    override fun back() { if (ready) match.paused = !match.paused else app.go(MainMenu(app)) }
-    override fun onPause() { if (ready && !match.over) match.paused = true }
+    override fun back() {
+        if (!ready) { app.go(MainMenu(app)); return }
+        if (lock != null) match.hud.menuOpen = !match.hud.menuOpen else match.paused = !match.paused
+    }
+    override fun onPause() { if (ready && !match.over && lock == null) match.paused = true }
     override fun leave() { Sfx.music(1) }
 }
 
@@ -427,20 +490,28 @@ class ResultScreen(app: GameApp, val m: Match) : Screen(app) {
         Save.coins += coins; Save.trophies = maxOf(0, Save.trophies + trophies); Save.xp += xp
         Save.matches += 1; Save.kills += k; if (won) Save.wins += 1
         pl?.let { Save.addHeroTrophies(it.hero.id.coerceAtMost(11), trophies) }
-        for (i in 0 until 80) confetti.add(floatArrayOf(rf() * app.w, -rf() * app.h, rf(60f, 180f), rf() * 6f, (i % 6).toFloat()))
+        for (i in 0 until 80) confetti.add(floatArrayOf(frf() * app.w, -frf() * app.h, frf(60f, 180f), frf() * 6f, (i % 6).toFloat()))
         Sfx.music(1)
     }
 
     override fun layout() {
         val u = app.u; val w = app.w; val h = app.h
         btns.clear()
+        val ses = com.starguys.battle.net.Net.session
+        if (m.cfg.net && ses != null && !ses.closed) {
+            btns.add(Btn("SALON", w - 360f * u, h - 130f * u, 320f * u, 100f * u, CYAN) {
+                if (ses is com.starguys.battle.net.HostSession) { ses.endMatch(); app.go(HostLobby(app, ses.kind)) } else { ses.inMatch = false; app.go(ClientLobby(app)) }
+            }.also { it.textSize = 40f })
+            btns.add(Btn("QUITTER", w - 600f * u, h - 130f * u, 220f * u, 100f * u, GREY) { com.starguys.battle.net.Net.leave(); app.go(MainMenu(app)) }.also { it.textSize = 32f })
+            return
+        }
         btns.add(Btn("REJOUER", w - 360f * u, h - 130f * u, 320f * u, 100f * u, ORANGE) { app.go(GameScreen(app, MatchConfig(m.cfg.mode, Save.hero, m.cfg.biome, m.cfg.role, m.cfg.creative, m.cfg.creativeKind))) }.also { it.textSize = 40f })
         btns.add(Btn("MENU", w - 600f * u, h - 130f * u, 220f * u, 100f * u, GREY) { app.go(MainMenu(app)) }.also { it.textSize = 36f })
     }
 
     override fun update(dt: Float) {
         t += dt
-        if (won) for (cf in confetti) { cf[1] += cf[2] * dt; cf[3] += dt * 3f; if (cf[1] > app.h) { cf[1] = -20f; cf[0] = rf() * app.w } }
+        if (won) for (cf in confetti) { cf[1] += cf[2] * dt; cf[3] += dt * 3f; if (cf[1] > app.h) { cf[1] = -20f; cf[0] = frf() * app.w } }
     }
 
     override fun draw(c: Canvas) {
@@ -491,5 +562,5 @@ class ResultScreen(app: GameApp, val m: Match) : Screen(app) {
         }
     }
 
-    override fun back() { app.go(MainMenu(app)) }
+    override fun back() { if (m.cfg.net) com.starguys.battle.net.Net.leave(); app.go(MainMenu(app)) }
 }

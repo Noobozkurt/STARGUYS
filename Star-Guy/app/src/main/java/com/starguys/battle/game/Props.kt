@@ -11,7 +11,7 @@ import com.starguys.battle.core.rf
 import com.starguys.battle.core.ri
 import com.starguys.battle.core.sinf
 import kotlin.math.abs
-import kotlin.math.atan2
+import com.starguys.battle.core.atan2
 import kotlin.math.sqrt
 
 abstract class Prop(m: Match, px: Float, py: Float) : Body(m) {

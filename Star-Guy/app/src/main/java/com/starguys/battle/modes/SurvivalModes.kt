@@ -36,7 +36,7 @@ class RoyaleMode(m: Match, val meteors: Boolean) : GameMode(m) {
 
     override fun build() {
         val biome = Modes.pickBiome(m)
-        val n = if (meteors) 16 else Save.royaleSize.coerceIn(10, 40)
+        val n = if (meteors) 16 else m.cfg.brSize.coerceIn(10, 40)
         val size = if (meteors) 46 else (36 + n).coerceAtMost(72)
         MapGen.royale(m, biome, size)
         val p = m.randomSpawn(6f * T)
@@ -64,8 +64,8 @@ class RoyaleMode(m: Match, val meteors: Boolean) : GameMode(m) {
                 toR = full * radii[phase]
                 val slack = fromR - toR
                 val a = rf() * 6.28f; val d = rf() * slack * 0.5f
-                toX = (fromX + kotlin.math.cos(a) * d).coerceIn(toR * 0.5f, m.map.pxW - toR * 0.5f)
-                toY = (fromY + kotlin.math.sin(a) * d).coerceIn(toR * 0.5f, m.map.pxH - toR * 0.5f)
+                toX = (fromX + com.starguys.battle.core.cosf(a) * d).coerceIn(toR * 0.5f, m.map.pxW - toR * 0.5f)
+                toY = (fromY + com.starguys.battle.core.sinf(a) * d).coerceIn(toR * 0.5f, m.map.pxH - toR * 0.5f)
                 m.hud.big("LA ZONE RÉTRÉCIT !", 0xFFE0B0FF.toInt(), 2f)
                 Sfx.play(Sfx.ALARM, 0.6f)
             }

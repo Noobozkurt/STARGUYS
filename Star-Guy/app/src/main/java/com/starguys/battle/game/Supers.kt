@@ -7,7 +7,7 @@ import com.starguys.battle.core.cosf
 import com.starguys.battle.core.floorInt
 import com.starguys.battle.core.rf
 import com.starguys.battle.core.sinf
-import kotlin.math.atan2
+import com.starguys.battle.core.atan2
 import kotlin.math.roundToInt
 
 /** Hero supers and gadgets. */
@@ -138,7 +138,7 @@ object Supers {
                 m.fx.smoke(f.x, f.y - f.z * ZS, 4, 0xFFFFC94D.toInt())
                 m.sound(Sfx.ENGINE, f.x, f.y)
             }
-            Gadgets.PARACHUTE -> { if (f.human) m.hud.toastSmall("Le parachute s'active tout seul en cas de chute !"); return false }
+            Gadgets.PARACHUTE -> { if (f.isLocal) m.hud.toastSmall("Le parachute s'active tout seul en cas de chute !"); return false }
             Gadgets.BANANA -> {
                 m.addProp(BananaPeel(m, f.x - cosf(f.face) * 40f, f.y - sinf(f.face) * 40f, f.team, f))
                 m.sound(Sfx.SWING, f.x, f.y, 0.5f)

@@ -69,14 +69,15 @@ class Btn(var label: String, var x: Float, var y: Float, var w: Float, var h: Fl
     fun hit(px: Float, py: Float, u: Float): Boolean = px >= x - 6 * u && px <= x + w + 6 * u && py >= y - 6 * u && py <= y + h + 6 * u
 
     fun draw(c: Canvas, u: Float) {
-        val off = if (pressed) 4 * u else 0f
         val lip = 7 * u
-        val col = if (enabled) color else 0xFF8A8494.toInt()
+        val off = if (pressed) lip * 0.6f else 0f
+        val col = if (enabled) color else TW.SLATE_500
         G.ow = 3 * u
-        G.rrect(c, x, y + lip, x + w, y + h + lip, 16 * u, G.shade(col, 0.6f))
-        G.rrect(c, x, y + off, x + w, y + h + off, 16 * u, col)
-        G.rrect(c, x + 6 * u, y + off + 5 * u, x + w - 6 * u, y + off + h * 0.42f, 10 * u, G.alpha(G.WHITE, 0.22f), false)
-        if (selected) { G.stroke.strokeWidth = 5 * u; G.rf.set(x - 5 * u, y - 5 * u, x + w + 5 * u, y + h + lip + 5 * u); G.stroke.color = 0xFFFFE14D.toInt(); c.drawRoundRect(G.rf, 20 * u, 20 * u, G.stroke) }
+        val wasDepth = G.depth; G.depth = false
+        if (selected) { G.fill.shader = null; G.fill.color = G.alpha(TW.AMBER_300, 0.35f); G.rf.set(x - 9 * u, y - 9 * u, x + w + 9 * u, y + h + lip + 9 * u); c.drawRoundRect(G.rf, 24 * u, 24 * u, G.fill) }
+        G.button(c, x, y, x + w, y + h, 18 * u, col, lip, pressed, u)
+        if (selected) { G.stroke.strokeWidth = 4.5f * u; G.rf.set(x - 5 * u, y - 5 * u, x + w + 5 * u, y + h + lip + 5 * u); G.stroke.color = TW.AMBER_300; c.drawRoundRect(G.rf, 22 * u, 22 * u, G.stroke) }
+        G.depth = wasDepth
         val ts = if (textSize > 0) textSize * u else minOf(h * 0.42f, 34 * u)
         val ic = icon
         if (ic != null) {
@@ -133,6 +134,7 @@ class GameApp(val act: Activity) {
         }
         if (fadeT > 0) fadeT -= dt
         if (toastT > 0) toastT -= dt
+        onFrame?.invoke(this)
         screen?.update(dt)
     }
 
@@ -158,18 +160,26 @@ class GameApp(val act: Activity) {
     fun touch(e: TouchEvt) { if (pending == null) screen?.touch(e) }
     fun back() { screen?.back() }
 
-    /** Animated candy-colored menu background. */
-    fun menuBackground(c: Canvas, top: Int = 0xFF5B2BD6.toInt(), bottom: Int = 0xFFFF5FA2.toInt()) {
-        bgPaint.shader = LinearGradient(0f, 0f, 0f, h, top, bottom, Shader.TileMode.CLAMP)
+    private var bgKey = 0L
+    /** Animated Tailwind-style gradient background (from-indigo-600 via-purple-600 to-pink-500) with glowing blobs. */
+    fun menuBackground(c: Canvas, top: Int = TW.INDIGO_600, bottom: Int = TW.PINK_500) {
+        val key = (top.toLong() shl 32) xor bottom.toLong() xor h.toLong()
+        if (key != bgKey) { bgPaint.shader = LinearGradient(0f, 0f, w * 0.35f, h, intArrayOf(top, G.mix(top, bottom, 0.5f), bottom), floatArrayOf(0f, 0.55f, 1f), Shader.TileMode.CLAMP); bgKey = key }
         c.drawRect(0f, 0f, w, h, bgPaint)
+        // big soft light blobs for depth
+        val wasDepth = G.depth; G.depth = false
+        G.glow(c, w * (0.18f + 0.04f * kotlin.math.sin(time * 0.3f)), h * 0.25f, h * 0.7f, G.alpha(TW.FUCHSIA_400, 0.45f))
+        G.glow(c, w * (0.85f + 0.03f * kotlin.math.cos(time * 0.25f)), h * 0.85f, h * 0.8f, G.alpha(TW.SKY_400, 0.4f))
+        G.glow(c, w * 0.55f, h * (0.1f + 0.05f * kotlin.math.sin(time * 0.4f)), h * 0.5f, G.alpha(TW.AMBER_300, 0.25f))
         // drifting stars & bubbles
-        for (i in 0 until 26) {
+        for (i in 0 until 30) {
             val sx = ((i * 197.3f + time * (14f + i % 5 * 6f)) % (w + 120)) - 60
             val sy = ((i * 83.7f) % h + kotlin.math.sin(time * 0.8f + i) * 18 * u)
-            val r = (6 + i % 4 * 5) * u
-            if (i % 3 == 0) G.star(c, sx, sy, r * 1.4f, r * 0.6f, 5, time * 0.5f + i, G.alpha(G.WHITE, 0.18f), false)
+            val r = (5 + i % 4 * 5) * u
+            if (i % 3 == 0) G.star(c, sx, sy, r * 1.4f, r * 0.6f, 5, time * 0.5f + i, G.alpha(G.WHITE, 0.22f), false)
             else G.circle(c, sx, sy, r, G.alpha(G.WHITE, 0.10f), false)
         }
+        G.depth = wasDepth
     }
 
     // ---- Android services (run on UI thread) ----
@@ -200,6 +210,18 @@ class GameApp(val act: Activity) {
     }
 
     fun quit() { act.runOnUiThread { act.finish() } }
+
+    /** called every frame on the game thread (multiplayer event pump) */
+    var onFrame: ((GameApp) -> Unit)? = null
+    private var permCb: ((Boolean) -> Unit)? = null
+
+    fun requestPermissions(perms: Array<String>, cb: (Boolean) -> Unit) {
+        if (Build.VERSION.SDK_INT < 23 || perms.all { act.checkSelfPermission(it) == android.content.pm.PackageManager.PERMISSION_GRANTED }) { cb(true); return }
+        permCb = cb
+        act.runOnUiThread { try { act.requestPermissions(perms, 77) } catch (e: Throwable) { onPermissionResult(false) } }
+    }
+
+    fun onPermissionResult(granted: Boolean) { val cb = permCb; permCb = null; if (cb != null) post { cb(granted) } }
 }
 
 /** SurfaceView + dedicated game thread with a fixed 60 Hz simulation step. */

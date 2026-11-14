@@ -154,7 +154,7 @@ class GunGameMode(m: Match) : DeathmatchMode(m, Weapons.gunGame.size, 8) {
     override fun creditKill(killer: Fighter, victim: Fighter) {
         if (killer.kills < Weapons.gunGame.size) {
             killer.modeWeapon = Weapons.list[Weapons.gunGame[killer.kills]]
-            if (killer.human) m.hud.big(killer.modeWeapon!!.name, 0xFFFFE14D.toInt(), 1.5f)
+            if (killer.isLocal) m.hud.big(killer.modeWeapon!!.name, 0xFFFFE14D.toInt(), 1.5f)
         }
     }
     override fun scatterLoot() {}
